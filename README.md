@@ -27,7 +27,7 @@ It consists of a set of basic types, composite types, and meta types that togeth
   - [List](#list)
   - [Dictionary](#dictionary)
   - [Map](#map)
-- [Cheat-sheet](#cheat-sheet)
+- [Cheat Sheet](#cheat-sheet)
 
 # Representation
 
@@ -275,7 +275,7 @@ The encoding of a dictionary is as follows:
 
 A map is just like a dictionary but instead, the keys can be of any type.
 
-# Cheat-sheet
+# Cheat Sheet
 
 | Marker  |                   Name                   |                Type                |
 | :-----: | :--------------------------------------: | :--------------------------------: |
@@ -287,9 +287,13 @@ A map is just like a dictionary but instead, the keys can be of any type.
 | `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
 | `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
 | `60-6F` |           [`string`](#strings)           |   [Primitive](#basic-data-types)   |
+| `70-7F` |            [`array`](#array)             | [Composite](#composite-data-types) |
+| `80-8F` |             [`list`](#list)              | [Composite](#composite-data-types) |
 | `A0-A2` |           [`string`](#strings)           |   [Primitive](#basic-data-types)   |
+| `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
+| `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
+| `DA-DC` |            [`array`](#array)             | [Composite](#composite-data-types) |
+| `DD-DF` |             [`list`](#list)              | [Composite](#composite-data-types) |
 |  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
 |  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
 |  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
-| `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
-| `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
