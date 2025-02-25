@@ -93,14 +93,15 @@ Booleans are encoded as their respective single byte and have no data bytes.
 |  `35`  |        10         |             [IEEE 754 Extended precision float](https://en.wikipedia.org/wiki/Extended_precision)             |
 |  `36`  |        16         | [IEEE 754 Quadruple precision float](https://en.wikipedia.org/wiki/Quadruple-precision_floating-point_format) |
 |  `37`  |        32         |   [IEEE 754 Octuple precision float](https://en.wikipedia.org/wiki/Octuple-precision_floating-point_format)   |
+|  `3F`  |         2         |             [Brain Floating Point](https://en.wikipedia.org/wiki/Bfloat16_floating-point_format)              |
 
 ### Decimals
 
-| Marker | Data Size (bytes) |                                             Type                                             |
-| :----: | :---------------: | :------------------------------------------------------------------------------------------: |
-|  `3A`  |         4         |     [IEEE 754 Decimal32](https://en.wikipedia.org/wiki/Decimal32_floating-point_format)      |
-|  `3B`  |         8         |     [IEEE 754 Decimal64](https://en.wikipedia.org/wiki/Decimal64_floating-point_format)      |
-|  `3C`  |        16         | [IEEE 754 Double Decimal128](https://en.wikipedia.org/wiki/Decimal128_floating-point_format) |
+| Marker | Data Size (bytes) |                                         Type                                          |
+| :----: | :---------------: | :-----------------------------------------------------------------------------------: |
+|  `3A`  |         4         |  [IEEE 754 Decimal32](https://en.wikipedia.org/wiki/Decimal32_floating-point_format)  |
+|  `3B`  |         8         |  [IEEE 754 Decimal64](https://en.wikipedia.org/wiki/Decimal64_floating-point_format)  |
+|  `3C`  |        16         | [IEEE 754 Decimal128](https://en.wikipedia.org/wiki/Decimal128_floating-point_format) |
 
 ## Strings
 
@@ -286,6 +287,7 @@ A map is just like a dictionary but instead, the keys can be of any type.
 | `20-26` | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
 | `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
 | `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
+|  `3F`   |          [`bfloat16`](#floats)           |   [Primitive](#basic-data-types)   |
 | `60-6F` |           [`string`](#strings)           |   [Primitive](#basic-data-types)   |
 | `70-7F` |            [`array`](#array)             | [Composite](#composite-data-types) |
 | `80-8F` |             [`list`](#list)              | [Composite](#composite-data-types) |
