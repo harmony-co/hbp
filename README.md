@@ -133,6 +133,11 @@ Strings are `UTF-8` encoded lists of bytes.
 
 The string marker is always followed by a list marker with the the type byte set to `20` (u8), the byte marker can also be omitted as deserializers can infer the type from the string meta type.
 
+## Vector
+
+Marker: `E3`
+
+The vector marker must **always** be followed by a list marker to indicate the size and type of the vector, the data should follow the same encoding as the indicated type.
 
 ## Optional
 
