@@ -59,6 +59,8 @@ Booleans are encoded as their respective single byte and have no data bytes.
 
 ### Signed Integers
 
+Fixed size integers:
+
 | Marker | Data Size (bytes) | Zig Type |
 | :----: | :---------------: | :------: |
 |  `10`  |         1         |   `i8`   |
@@ -69,7 +71,15 @@ Booleans are encoded as their respective single byte and have no data bytes.
 |  `15`  |        32         |  `i256`  |
 |  `16`  |        64         |  `i512`  |
 
+Arbitrary size integers:
+
+Marker: `1F`
+
+Arbitrary sized integers are followed by `2` bytes designating their bit-width, however serializers should always aim to byte align the size.
+
 ### Unsigned Integers
+
+Fixed size integers:
 
 | Marker | Data Size (bytes) | Zig Type |
 | :----: | :---------------: | :------: |
@@ -80,6 +90,12 @@ Booleans are encoded as their respective single byte and have no data bytes.
 |  `24`  |        16         |  `u128`  |
 |  `25`  |        32         |  `u256`  |
 |  `26`  |        64         |  `u512`  |
+
+Arbitrary size integers:
+
+Marker: `2F`
+
+Arbitrary sized integers are followed by `2` bytes designating their bit-width, however serializers should always aim to byte align the size.
 
 ### Floats
 
@@ -260,7 +276,9 @@ A map is just like a dictionary but instead, the keys can be of any type.
 |  `01`   |             [`false`](#bool)             |   [Primitive](#basic-data-types)   |
 |  `02`   |             [`true`](#bool)              |   [Primitive](#basic-data-types)   |
 | `10-16` |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
+|  `1F`   |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
 | `20-26` | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
+|  `2F`   | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
 | `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
 | `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
 |  `3F`   |          [`bfloat16`](#floats)           |   [Primitive](#basic-data-types)   |
