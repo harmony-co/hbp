@@ -103,44 +103,20 @@ Booleans are encoded as their respective single byte and have no data bytes.
 |  `3B`  |         8         |  [IEEE 754 Decimal64](https://en.wikipedia.org/wiki/Decimal64_floating-point_format)  |
 |  `3C`  |        16         | [IEEE 754 Decimal128](https://en.wikipedia.org/wiki/Decimal128_floating-point_format) |
 
-## Strings
-
-Short strings:
-
-| Marker | Data Size (bytes) |
-| :----: | :---------------: |
-|  `60`  |         0         |
-|  `61`  |         1         |
-|  `62`  |         2         |
-|  `63`  |         3         |
-|  `64`  |         4         |
-|  `65`  |         5         |
-|  `66`  |         6         |
-|  `67`  |         7         |
-|  `68`  |         8         |
-|  `69`  |         9         |
-|  `6A`  |        10         |
-|  `6B`  |        11         |
-|  `6C`  |        12         |
-|  `6D`  |        13         |
-|  `6E`  |        14         |
-|  `6F`  |        15         |
-
-Long strings:
-
-| Marker | Extra bytes |   Data Size (bytes)    |
-| :----: | :---------: | :--------------------: |
-|  `A0`  |      1      |        16 ~ 255        |
-|  `A1`  |      2      |      256 ~ 65_535      |
-|  `A2`  |      4      | 65_536 ~ 4_294_967_295 |
-
-Strings are text data represented as UTF-8 encoded bytes.
-
 # Meta Data Types
 
 Meta data types are special types that acts as metadata for other types and they usually take up at least 2 bytes, the first byte being the meta type itself and the second one being the marker for the inner type.
 
-HBP reserves all the `F0-FF` range for meta types.
+HBP reserves all the `E0-FF` range for meta types.
+
+## String
+
+Marker: `E0`
+
+Strings are `UTF-8` encoded lists of bytes. 
+
+The string marker is always followed by a list marker with the the type byte set to `20` (u8), the byte marker can also be omitted as deserializers can infer the type from the string meta type.
+
 
 ## Optional
 
@@ -288,14 +264,13 @@ A map is just like a dictionary but instead, the keys can be of any type.
 | `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
 | `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
 |  `3F`   |          [`bfloat16`](#floats)           |   [Primitive](#basic-data-types)   |
-| `60-6F` |           [`string`](#strings)           |   [Primitive](#basic-data-types)   |
 | `70-7F` |            [`array`](#array)             | [Composite](#composite-data-types) |
 | `80-8F` |             [`list`](#list)              | [Composite](#composite-data-types) |
-| `A0-A2` |           [`string`](#strings)           |   [Primitive](#basic-data-types)   |
 | `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
 | `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
 | `DA-DC` |            [`array`](#array)             | [Composite](#composite-data-types) |
 | `DD-DF` |             [`list`](#list)              | [Composite](#composite-data-types) |
+|  `E0`   |           [`string`](#string)            |      [Meta](#meta-data-types)      |
 |  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
 |  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
-|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
+|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      | ` |
