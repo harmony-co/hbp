@@ -1,0 +1,13 @@
+anytype
+comptime
+deinit
+isize
+nosuspend
+struct
+usingnamespace
+usize
+orelse
+callconv
+anyerror
+anyopaque
+memcpy

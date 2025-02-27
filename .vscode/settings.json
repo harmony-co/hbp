@@ -1,5 +1,7 @@
 {
     "cSpell.words": [
-        "Minifloat"
-    ]
+        "Minifloat",
+        "signedness"
+    ],
+    "zig.zls.enableBuildOnSave": true
 }
