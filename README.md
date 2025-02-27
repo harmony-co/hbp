@@ -294,6 +294,7 @@ A map is just like a dictionary but instead, the keys can be of any type.
 | `DA-DC` |            [`array`](#array)             | [Composite](#composite-data-types) |
 | `DD-DF` |             [`list`](#list)              | [Composite](#composite-data-types) |
 |  `E0`   |           [`string`](#string)            |      [Meta](#meta-data-types)      |
+|  `E3`   |           [`vector`](#vector)            |      [Meta](#meta-data-types)      |
 |  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
 |  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
-|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      | ` |
+|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
