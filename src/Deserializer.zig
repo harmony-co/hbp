@@ -27,7 +27,7 @@ test deserializeBool {
 /// or fit in the given integer type.
 pub fn deserializeIntAssumeType(comptime T: type, buffer: []const u8) std.math.ByteAlignedInt(T) {
     const alignedType = std.math.ByteAlignedInt(T);
-    const info = @typeInfo(alignedType).Int;
+    const info = @typeInfo(alignedType).int;
 
     const base = if (comptime info.signedness == .signed) 0x10 else 0x20;
 

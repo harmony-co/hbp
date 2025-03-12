@@ -24,7 +24,7 @@ test serializeBool {
 
 pub fn serializeInt(comptime T: type, buf: []u8, value: T) []const u8 {
     const alignedType = std.math.ByteAlignedInt(T);
-    const info = @typeInfo(alignedType).Int;
+    const info = @typeInfo(alignedType).int;
 
     const base = if (comptime info.signedness == .signed) 0x10 else 0x20;
 
@@ -39,7 +39,7 @@ pub fn serializeInt(comptime T: type, buf: []u8, value: T) []const u8 {
         else => |bits| &[_]u8{base + 0x0F} ++ &@as([2]u8, @bitCast(if (native_endian == .big) bits else @byteSwap(bits))),
     };
 
-    const buffer_size = comptime @divExact(@typeInfo(alignedType).Int.bits, 8);
+    const buffer_size = comptime @divExact(@typeInfo(alignedType).int.bits, 8);
 
     var buffer: [1 + marker.len + buffer_size]u8 = undefined;
     buffer[0] = HBP_VERSION;

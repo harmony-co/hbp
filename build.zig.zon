@@ -1,5 +1,6 @@
 .{
-    .name = "hbp",
+    .fingerprint = 0x8af3a6b7cf3baeb7,
+    .name = .libhbp,
     .version = "0.0.0",
     .paths = .{
         "build.zig",
