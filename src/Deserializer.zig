@@ -30,19 +30,20 @@ pub fn deserializeIntAssumeType(comptime T: type, buffer: []const u8) std.math.B
     const info = @typeInfo(alignedType).int;
 
     const base = if (comptime info.signedness == .signed) 0x10 else 0x20;
+    const buf = if (buffer[0] == HBP_VERSION) buffer[1..] else buffer;
 
-    switch (buffer[1]) {
+    switch (buf[0]) {
         base...(base + 6) => {
-            const slice = buffer[2..];
+            const slice = buf[1..];
             assert(slice.len <= (info.bits / 8));
             const data = std.mem.bytesToValue(alignedType, slice);
-            return if (native_endian == .big) data else @byteSwap(data);
+            return std.mem.nativeToBig(alignedType, data);
         },
         base + 0x0F => {
-            const slice = buffer[4..];
+            const slice = buf[3..];
             assert(slice.len <= (info.bits / 8));
             const data = std.mem.bytesToValue(alignedType, slice);
-            return if (native_endian == .big) data else @byteSwap(data);
+            return std.mem.nativeToBig(alignedType, data);
         },
         else => unreachable,
     }

@@ -10,6 +10,19 @@ const native_endian = builtin.cpu.arch.endian();
 
 const Serializer = @This();
 
+allocator: std.mem.Allocator,
+
+pub fn serializeNull(buf: []u8) []const u8 {
+    buf[0] = HBP_VERSION;
+    buf[1] = 0x00;
+    return buf[0..2];
+}
+
+test serializeNull {
+    var buf: [8]u8 = undefined;
+    try expect(eql(u8, serializeNull(&buf), &.{ 0x01, 0x00 }));
+}
+
 pub fn serializeBool(buf: []u8, value: bool) []const u8 {
     buf[0] = HBP_VERSION;
     buf[1] = if (value) 0x02 else 0x01;
@@ -49,7 +62,7 @@ pub fn serializeInt(comptime T: type, buf: []u8, value: T) []const u8 {
     }
 
     const offset_ptr: *[buffer_size]u8 = @ptrFromInt(@intFromPtr(&buffer) + marker.len + 1);
-    offset_ptr.* = @bitCast(if (comptime native_endian == .big) @as(alignedType, value) else @byteSwap(@as(alignedType, value)));
+    offset_ptr.* = @bitCast(std.mem.nativeToBig(alignedType, value));
 
     @memcpy(buf[0..buffer.len], &buffer);
     return buf[0..buffer.len];
