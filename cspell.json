@@ -7,10 +7,10 @@
     "dictionaryDefinitions": [
         {
             "name": "zig",
-            "path": "./zig.txt"
-        }
+            "path": ".vscode/cspell/zig.cspell"
+        },
     ],
     "dictionaries": [
-        "zig"
+        "zig",
     ]
 }

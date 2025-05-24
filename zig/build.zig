@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    const check = b.step("check", "Check if foo compiles");
+    const check = b.step("check", "Check if it compiles");
     check.dependOn(&exe.step);
 
     const exe_test = b.addTest(.{
