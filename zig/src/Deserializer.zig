@@ -49,6 +49,17 @@ pub fn deserializeIntAssumeType(comptime T: type, buffer: []const u8) std.math.B
     }
 }
 
+pub fn deserializeStringAssumeLength(comptime max_len: u32, buffer: []const u8) !struct { [max_len]u8, u32 } {
+    var buf = if (buffer[0] == HBP_VERSION) buffer[1..] else buffer;
+    if (buf[0] != 0xE0) return error.InvalidBuffer;
+
+    buf = buf[3..];
+
+    var temp: [max_len]u8 = undefined;
+    @memcpy(temp[0..buf.len], buf);
+    return .{ temp, @intCast(buf.len) };
+}
+
 test deserializeIntAssumeType {
     try expect(deserializeIntAssumeType(i8, &.{ 0x01, 0x10, 0x2D }) == 45);
     try expect(deserializeIntAssumeType(i16, &.{ 0x01, 0x11, 0x18, 0xCB }) == 6347);

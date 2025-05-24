@@ -32,6 +32,16 @@ pub fn calculateMarker(comptime T: type) []const u8 {
                     else => |bits| &[_]u8{base + 0x0F} ++ &@as([2]u8, @bitCast(if (native_endian == .big) bits else @byteSwap(bits))),
                 };
             },
+            .array => |arr| {
+                const is_string = arr.sentinel() != null;
+                const base = 0x80;
+                const marker = blk: {
+                    if (arr.len <= 15) break :blk [_]u8{base + arr.len} ++ calculateMarker(arr.child);
+                    @compileError("Not yet implemented");
+                };
+                if (is_string) return [_]u8{0xE0} ++ marker;
+                return marker;
+            },
             else => unreachable,
         }
     }
@@ -45,6 +55,9 @@ pub fn calculateBufferLen(comptime T: type) comptime_int {
             .int => |i| {
                 return @divExact(i.bits, 8);
             },
+            .array => |arr| {
+                return calculateBufferLen(arr.child) * arr.len;
+            },
             else => unreachable,
         }
     }
@@ -57,6 +70,7 @@ pub fn Buffer(comptime T: type) type {
         return switch (type_info) {
             .null, .bool => [2]u8,
             .int => [1 + calculateMarker(T).len + calculateBufferLen(ByteAlignedInt(T))]u8,
+            .array => [1 + calculateMarker(T).len + calculateBufferLen(T)]u8,
             else => unreachable,
         };
     }
@@ -88,7 +102,6 @@ test serializeBool {
 pub fn serializeInt(comptime T: type, value: T) Buffer(T) {
     const aligned_type = ByteAlignedInt(T);
     const marker = comptime calculateMarker(T);
-    const buffer_size = comptime calculateBufferLen(aligned_type);
 
     var buffer: Buffer(T) = undefined;
     buffer[0] = HBP_VERSION;
@@ -97,8 +110,7 @@ pub fn serializeInt(comptime T: type, value: T) Buffer(T) {
         buffer[i] = byte;
     }
 
-    const offset_ptr: *[buffer_size]u8 = @ptrFromInt(@intFromPtr(&buffer) + marker.len + 1);
-    offset_ptr.* = @bitCast(std.mem.nativeToBig(aligned_type, value));
+    buffer[1 + marker.len ..].* = @bitCast(std.mem.nativeToBig(aligned_type, value));
 
     return buffer;
 }
@@ -125,4 +137,50 @@ test serializeInt {
     try expect(eql(u8, &serializeInt(u6, 30), &.{ 0x01, 0x20, 0x1E }));
     try expect(eql(u8, &serializeInt(u38, 9123424), &.{ 0x01, 0x2F, 0x00, 0x28, 0x00, 0x00, 0x8B, 0x36, 0x60 }));
     try expect(eql(u8, &serializeInt(u80, 5294967295), &.{ 0x01, 0x2F, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x3B, 0x9A, 0xC9, 0xFF }));
+}
+
+pub fn serializeList(comptime T: type, comptime max_len: u32, value: []const T) struct { Buffer([max_len]T), u32 } {
+    assert(value.len <= max_len);
+    const type_info = @typeInfo(T);
+
+    // TODO: Support more types
+    if (type_info != .int) @compileError("Only integer lists are supported");
+
+    var buffer: Buffer([max_len]T) = undefined;
+    buffer[0] = HBP_VERSION;
+
+    const marker = comptime calculateMarker([max_len]T);
+
+    inline for (marker, 1..) |byte, i| {
+        buffer[i] = byte;
+    }
+
+    const byte_size = calculateBufferLen(T);
+    var real_length: u32 = 1 + marker.len;
+
+    for (value) |el| {
+        @memcpy(buffer[real_length .. real_length + byte_size], &@as([byte_size]u8, @bitCast(std.mem.nativeToBig(T, el))));
+        real_length += byte_size;
+    }
+
+    return .{ buffer, real_length };
+}
+
+// TODO: Merge this properly with `serializeList`
+pub fn serializeString(comptime max_len: u32, value: []const u8) struct { Buffer([max_len:0]u8), u32 } {
+    assert(value.len <= max_len);
+    var buffer: Buffer([max_len:0]u8) = undefined;
+    buffer[0] = HBP_VERSION;
+
+    const marker = comptime calculateMarker([max_len:0]u8);
+
+    inline for (marker, 1..) |byte, i| {
+        buffer[i] = byte;
+    }
+
+    const initial_len: usize = 1 + marker.len;
+
+    @memcpy(buffer[initial_len .. initial_len + value.len], value);
+
+    return .{ buffer, @intCast(initial_len + value.len) };
 }

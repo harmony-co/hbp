@@ -3,11 +3,12 @@ const Serializer = @import("./Serializer.zig");
 const Deserializer = @import("./Deserializer.zig");
 
 pub fn main() !void {
-    const serialized = Serializer.serializeInt(u8, 205);
-    const deserialized = Deserializer.deserializeIntAssumeType(u8, &serialized);
+    const serialized, const length = Serializer.serializeString(15, "Hello World");
+    const deserialized, const len = try Deserializer.deserializeStringAssumeLength(15, serialized[0..length]);
 
-    var buf2: [10000]u8 = undefined;
-    std.debug.print("HBP payload: {s} ({d})\n", .{ readableOutput(&buf2, &serialized), deserialized });
+    var buf2: [64]u8 = undefined;
+    std.debug.print("HBP payload: {s} ({s})\n", .{ readableOutput(&buf2, serialized[0..length]), deserialized[0..len] });
+    // std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf2, serialized[0..length])});
 }
 
 fn readableOutput(buffer: []u8, input: []const u8) []const u8 {
