@@ -1,4 +1,8 @@
 {
+    "lldb.displayFormat": "auto",
+    "lldb.showDisassembly": "auto",
+    "lldb.dereferencePointers": true,
+    "lldb.consoleMode": "commands",
     "cSpell.words": [
         "libhbp",
         "Minifloat",
