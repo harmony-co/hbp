@@ -1,0 +1,29 @@
+{
+  "name": "hbp",
+  "version": "0.0.0",
+  "description": "Harmony Binary Protocol",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && eslint .",
+    "build": "rm -rf dist && tsc",
+    "dev": "npm run build && node dist/src/index.js",
+    "test": "node --test \"**/*.test.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/harmony-co/hbp.git"
+  },
+  "author": "harmony-co",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/harmony-co/hbp/issues"
+  },
+  "homepage": "https://github.com/harmony-co/hbp#readme",
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^2.9.0",
+    "eslint": "^9.12.0",
+    "eslint-plugin-jsdoc": "^50.4.1",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.9.0"
+  }
+}
