@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import {
     deserializeInt,
     deserializeBool,
+    deserializeString,
 } from '../dist/src/Deserialzer.js';
 
 test('deserializeBool', () => {
@@ -11,7 +12,7 @@ test('deserializeBool', () => {
     assert.strictEqual(deserializeBool(Buffer.from([0x01, 0x02])), true);
 });
 
-test('deserializeIntAssumeType', () => {
+test('deserializeInt', () => {
     const cases = [
         [0x01, 0x10, 0x2D], // i8
         [0x01, 0x11, 0x18, 0xCB], // i16
@@ -66,4 +67,27 @@ test('deserializeIntAssumeType', () => {
         const result = deserializeInt(Buffer.from(cases[i]));
         assert.strictEqual(result, expected[i], `Case ${i} failed`);
     }
+});
+
+test("deserializeString", () => {
+    const cases = [
+        [0x01, 0xE0, 0x8B, 0x20, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64],
+    ];
+
+    const expected = [
+        "Hello World",
+    ];
+
+    for (let i = 0; i < cases.length; i++) {
+        const result = deserializeString(Buffer.from(cases[i]));
+        assert.strictEqual(result, expected[i], `Case ${i} failed`);
+    }
+});
+
+test("deserializeStringCounter", () => {
+    assert.throws(() => {
+        deserializeString(Buffer.from(
+            [0x01, 0xE0, 0xAA, 0x20, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64]
+        ))
+    }, /^Error: Invalid Buffer: Expected a list marker in ranges of \[0x80, 0x8F\] or \[0xDD, 0xDF\], got 0xAA$/);
 });
