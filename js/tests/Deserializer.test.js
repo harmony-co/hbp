@@ -7,8 +7,8 @@ import {
 } from '../dist/src/Deserialzer.js';
 
 test('deserializeBool', () => {
-    assert.strictEqual(deserializeBool(Uint8Array.from([0x01, 0x01])), false);
-    assert.strictEqual(deserializeBool(Uint8Array.from([0x01, 0x02])), true);
+    assert.strictEqual(deserializeBool(Buffer.from([0x01, 0x01])), false);
+    assert.strictEqual(deserializeBool(Buffer.from([0x01, 0x02])), true);
 });
 
 test('deserializeIntAssumeType', () => {
@@ -63,7 +63,7 @@ test('deserializeIntAssumeType', () => {
     ];
 
     for (let i = 0; i < cases.length; i++) {
-        const result = deserializeInt(Uint8Array.from(cases[i]));
+        const result = deserializeInt(Buffer.from(cases[i]));
         assert.strictEqual(result, expected[i], `Case ${i} failed`);
     }
 });
