@@ -40,7 +40,7 @@ export function deserializeString(buffer: Buffer): string {
         throw new Error(`Invalid Buffer: Expected a list marker in ranges of [0x80, 0x8F] or [0xDD, 0xDF], got ${fHex(buf[1])}`);
     buf = buf.subarray(2);
 
-    if (buf[2] === 0x20) buf = buf.subarray(1);
+    if (buf[0] === 0x20) buf = buf.subarray(1);
 
-    return buf.subarray(1).toString();
+    return buf.toString();
 }
