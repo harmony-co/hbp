@@ -40,7 +40,11 @@ export function deserializeString(buffer: Buffer): string {
         throw new Error(`Invalid Buffer: Expected a list marker in ranges of [0x80, 0x8F] or [0xDD, 0xDF], got ${fHex(buf[1])}`);
     buf = buf.subarray(2);
 
-    if (buf[0] === 0x20) buf = buf.subarray(1);
+    switch (buf[0]) {
+        case 0x20: return buf.toString(undefined, 1);
+        // `toString` only supports `LE` encoding. Since we expect `BE`, the bytes need to be swapped
+        case 0x21: return buf.subarray(1).swap16().toString("utf16le");
+    }
 
-    return buf.toString();
+    throw new Error(`Invalid Buffer: Expected a number type byte of [0x20, 0x21], got ${fHex(buf[0])}`);
 }
