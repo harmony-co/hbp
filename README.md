@@ -1,5 +1,8 @@
 # About
 
+> [!CAUTION]
+> The HBP spec is still in the prototype phase, the versioning portion of the spec will not be used until 1.0 is in place.
+
 Harmony Binary Protocol (HBP) is a general purpose serialization protocol inspired by the protocols like Bolt's PackStream and Redis's RESP3, that aims to provide a standardized type aware way to serialize and deserialize data.
 
 It consists of a set of basic types, composite types, and meta types that together allow you to represent data in the way you need.
@@ -33,8 +36,6 @@ It consists of a set of basic types, composite types, and meta types that togeth
 # Representation
 
 Every serialized HBP value begins with the HBP version used to encode it followed by a marker that represents the type of the data.
-
-Some markers might use up to 5 extra bytes to indicate certain information about the data it represents.
 
 ![representation image](representation.png)
 
@@ -130,9 +131,14 @@ HBP reserves all the `E0-FF` range for meta types.
 
 Marker: `E0`
 
-Strings are `UTF-8` encoded lists of bytes. 
+A String is a character encoded list of bytes.
 
-The string marker is always followed by a list marker with the the type byte set to `20` (u8), the byte marker can also be omitted as deserializers can infer the type from the string meta type.
+The string marker is always followed by a list marker with the type byte set to one of the following:
+
+| Byte | Encoding |
+| ---- | -------- |
+| `20` | UTF-8    |
+| `21` | UTF-16   |
 
 ## Vector
 
