@@ -21,6 +21,7 @@
   "homepage": "https://github.com/harmony-co/hbp#readme",
   "devDependencies": {
     "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/node": "^24.1.0",
     "eslint": "^9.12.0",
     "eslint-plugin-jsdoc": "^50.4.1",
     "typescript": "^5.8.3",
