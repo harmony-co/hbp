@@ -1,15 +1,5 @@
-export const HBP_VERSION = 0x01;
-
-function fHex(hex: number): string {
-    return `0x${hex.toString(16).toUpperCase()}`;
-}
-
-function toBig(buffer: Buffer): bigint {
-    let result = BigInt(0);
-    for (let i = 0; i < buffer.length; i++) result = (result << BigInt(8)) | BigInt(buffer[i]);
-
-    return result;
-}
+import { HBP_VERSION } from "./index.js";
+import { fHex, toBig } from "./util.js";
 
 export function deserializeBool(buffer: Buffer): boolean {
     switch (buffer[1]) {
