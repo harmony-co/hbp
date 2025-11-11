@@ -7,11 +7,15 @@ pub fn build(b: *std.Build) void {
     const config_options = b.addOptions();
     config_options.addOption(u8, "HBP_VERSION", 1);
 
-    const exe = b.addExecutable(.{
-        .name = "hbp",
+    const exe_mod = b.addModule("hbp", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "hbp",
+        .root_module = exe_mod,
     });
 
     b.installArtifact(exe);
@@ -26,12 +30,7 @@ pub fn build(b: *std.Build) void {
     const check = b.step("check", "Check if it compiles");
     check.dependOn(&exe.step);
 
-    const exe_test = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
+    const exe_test = b.addTest(.{ .root_module = exe_mod });
     exe_test.root_module.addOptions("config", config_options);
 
     const test_artifact = b.addRunArtifact(exe_test);
