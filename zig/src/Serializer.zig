@@ -12,7 +12,7 @@ const native_endian = builtin.cpu.arch.endian();
 
 const Serializer = @This();
 
-pub fn calculateMarker(comptime T: type) []const u8 {
+fn calculateMarker(comptime T: type) []const u8 {
     comptime {
         const type_info = @typeInfo(T);
 
@@ -32,6 +32,16 @@ pub fn calculateMarker(comptime T: type) []const u8 {
                     else => |bits| &[_]u8{base + 0x0F} ++ &@as([2]u8, @bitCast(if (native_endian == .big) bits else @byteSwap(bits))),
                 };
             },
+            .float => |f| {
+                return switch (f.bits) {
+                    16 => &.{0x30},
+                    32 => &.{0x32},
+                    64 => &.{0x34},
+                    80 => &.{0x35},
+                    128 => &.{0x36},
+                    else => unreachable,
+                };
+            },
             .array => |arr| {
                 const is_string = arr.sentinel() != null;
                 const base = 0x80;
@@ -47,13 +57,16 @@ pub fn calculateMarker(comptime T: type) []const u8 {
     }
 }
 
-pub fn calculateBufferLen(comptime T: type) comptime_int {
+fn calculateBufferLen(comptime T: type) comptime_int {
     comptime {
         const type_info = @typeInfo(T);
 
         switch (type_info) {
             .int => |i| {
                 return @divExact(i.bits, 8);
+            },
+            .float => |f| {
+                return @divExact(f.bits, 8);
             },
             .array => |arr| {
                 return calculateBufferLen(arr.child) * arr.len;
@@ -63,13 +76,14 @@ pub fn calculateBufferLen(comptime T: type) comptime_int {
     }
 }
 
-pub fn Buffer(comptime T: type) type {
+fn Buffer(comptime T: type) type {
     comptime {
         const type_info = @typeInfo(T);
 
         return switch (type_info) {
             .null, .bool => [2]u8,
             .int => [1 + calculateMarker(T).len + calculateBufferLen(ByteAlignedInt(T))]u8,
+            .float => [2 + calculateBufferLen(T)]u8,
             .array => [1 + calculateMarker(T).len + calculateBufferLen(T)]u8,
             else => unreachable,
         };
@@ -88,7 +102,7 @@ test serializeNull {
 }
 
 pub fn serializeBool(value: bool) Buffer(bool) {
-    var buffer: Buffer(@TypeOf(null)) = undefined;
+    var buffer: Buffer(bool) = undefined;
     buffer[0] = HBP_VERSION;
     buffer[1] = if (value) 0x02 else 0x01;
     return buffer;
@@ -97,6 +111,20 @@ pub fn serializeBool(value: bool) Buffer(bool) {
 test serializeBool {
     try expect(eql(u8, &serializeBool(false), &.{ 0x01, 0x01 }));
     try expect(eql(u8, &serializeBool(true), &.{ 0x01, 0x02 }));
+}
+
+pub fn serializeFloat(comptime T: type, value: T) Buffer(T) {
+    const marker = comptime calculateMarker(T);
+    var buffer: Buffer(T) = undefined;
+    buffer[0] = HBP_VERSION;
+
+    inline for (marker, 1..) |byte, i| {
+        buffer[i] = byte;
+    }
+
+    buffer[1 + marker.len ..].* = @bitCast(value);
+
+    return buffer;
 }
 
 pub fn serializeInt(comptime T: type, value: T) Buffer(T) {
@@ -110,9 +138,13 @@ pub fn serializeInt(comptime T: type, value: T) Buffer(T) {
         buffer[i] = byte;
     }
 
-    buffer[1 + marker.len ..].* = @bitCast(std.mem.nativeToBig(aligned_type, value));
+    serializeIntInternal(aligned_type, buffer[1 + marker.len ..], value);
 
     return buffer;
+}
+
+fn serializeIntInternal(comptime T: type, buf: *[calculateBufferLen(T)]u8, value: T) void {
+    buf.* = @bitCast(std.mem.nativeToBig(T, value));
 }
 
 test serializeInt {
@@ -139,7 +171,7 @@ test serializeInt {
     try expect(eql(u8, &serializeInt(u80, 5294967295), &.{ 0x01, 0x2F, 0x00, 0x50, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x3B, 0x9A, 0xC9, 0xFF }));
 }
 
-pub fn serializeList(comptime T: type, comptime max_len: u32, value: []const T) struct { Buffer([max_len]T), u32 } {
+pub fn serializeList(comptime T: type, comptime max_len: u32, value: []T) struct { Buffer([max_len]T), u32 } {
     assert(value.len <= max_len);
     const type_info = @typeInfo(T);
 
@@ -159,14 +191,13 @@ pub fn serializeList(comptime T: type, comptime max_len: u32, value: []const T) 
     var real_length: u32 = 1 + marker.len;
 
     for (value) |el| {
-        @memcpy(buffer[real_length .. real_length + byte_size], &@as([byte_size]u8, @bitCast(std.mem.nativeToBig(T, el))));
+        serializeIntInternal(T, buffer[real_length .. real_length + byte_size], el);
         real_length += byte_size;
     }
 
     return .{ buffer, real_length };
 }
 
-// TODO: Merge this properly with `serializeList`
 pub fn serializeString(comptime max_len: u32, value: []const u8) struct { Buffer([max_len:0]u8), u32 } {
     assert(value.len <= max_len);
     var buffer: Buffer([max_len:0]u8) = undefined;

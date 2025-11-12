@@ -140,6 +140,8 @@ The string marker is always followed by a list marker with the type byte set to 
 | `20` | UTF-8    |
 | `21` | UTF-16   |
 
+The sender ensures the encoding of the strings is valid therefor, validation on the client is unnecessary.
+
 ## Vector
 
 Marker: `E3`
