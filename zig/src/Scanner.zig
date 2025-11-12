@@ -56,10 +56,12 @@ pub fn next(self: *Scanner) !Token {
                 .signed_int_256,
                 .signed_int_512,
                 => {
+                    self.state = .int;
                     continue :state .int;
                 },
                 .arbitrary_signed_int => {
                     self.cursor += 1;
+                    self.state = .arbitrary_int;
                     continue :state .arbitrary_int;
                 },
                 .unsigned_int_8,
@@ -70,10 +72,12 @@ pub fn next(self: *Scanner) !Token {
                 .unsigned_int_256,
                 .unsigned_int_512,
                 => {
+                    self.state = .uint;
                     continue :state .uint;
                 },
                 .arbitrary_unsigned_int => {
                     self.cursor += 1;
+                    self.state = .arbitrary_uint;
                     continue :state .arbitrary_uint;
                 },
                 .half_float => {
@@ -108,58 +112,39 @@ pub fn next(self: *Scanner) !Token {
                 else => return error.NotImplemented,
             }
         },
-        .int => {
+        .int, .uint => {
             const marker = self.input[self.cursor];
             self.cursor += 1;
 
             const byte_length = try calculateIntegerByteLength(marker);
             const value_start = self.cursor;
             self.cursor += byte_length;
+            const state = self.state;
             self.state = .post_value;
 
-            return .{ .int = .{
-                .signedness = .signed,
-                .view = self.input[value_start..self.cursor],
-            } };
+            return .{
+                .int = .{
+                    .signedness = if (state == .int) .signed else .unsigned,
+                    .view = self.input[value_start..self.cursor],
+                },
+            };
         },
-        .arbitrary_int => {
+        .arbitrary_int, .arbitrary_uint => {
             const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
             self.cursor += 2;
             const value_start = self.cursor;
             self.cursor += byte_length;
+            const state = self.state;
             self.state = .post_value;
 
-            return .{ .int = .{
-                .signedness = .signed,
-                .view = self.input[value_start..self.cursor],
-            } };
+            return .{
+                .int = .{
+                    .signedness = if (state == .arbitrary_int) .signed else .unsigned,
+                    .view = self.input[value_start..self.cursor],
+                },
+            };
         },
-        .uint => {
-            const marker = self.input[self.cursor];
-            self.cursor += 1;
 
-            const byte_length = try calculateIntegerByteLength(marker);
-            const value_start = self.cursor;
-            self.cursor += byte_length;
-            self.state = .post_value;
-
-            return .{ .int = .{
-                .signedness = .unsigned,
-                .view = self.input[value_start..self.cursor],
-            } };
-        },
-        .arbitrary_uint => {
-            const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
-            self.cursor += 2;
-            const value_start = self.cursor;
-            self.cursor += byte_length;
-            self.state = .post_value;
-
-            return .{ .int = .{
-                .signedness = .unsigned,
-                .view = self.input[value_start..self.cursor],
-            } };
-        },
         .post_value => {
             if (try self.checkEnd()) return .eos;
             return error.NeedToImplement;
