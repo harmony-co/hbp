@@ -4,8 +4,8 @@ const Scanner = @import("Scanner.zig");
 const assert = std.debug.assert;
 
 pub const ParseOptions = struct {
-    /// When set to `true` it will only allow parsing floats of the same size
-    /// Setting to `false` allows float widening to happen, this can cause imprecisions
+    /// Allow parsing `i8` as `u8` and vice-versa
+    ignore_integer_signedness: bool = false,
     float_behavior: enum(u1) {
         widen,
         preserve,
@@ -39,7 +39,9 @@ pub fn innerParse(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, c
         .int => |int| {
             const token = try scanner.next();
             if (token != Scanner.Token.int) return error.UnexpectedToken;
-            if (token.int.signedness != int.signedness) return error.WrongIntegerType;
+            if (comptime !options.ignore_integer_signedness) {
+                if (token.int.signedness != int.signedness) return error.WrongIntegerType;
+            }
 
             return sliceToInt(T, token.int.view);
         },

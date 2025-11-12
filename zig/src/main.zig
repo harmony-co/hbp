@@ -16,6 +16,9 @@ const test_int = [_][]const u8{
     &Serializer.serializeInt(i128, 28446744073709551615),
     &Serializer.serializeInt(i256, 340282366920938463463375607431768211456),
     &Serializer.serializeInt(i512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
+    &Serializer.serializeInt(i6, 30),
+    &Serializer.serializeInt(i38, 9123424),
+    &Serializer.serializeInt(i80, 5294967295),
 };
 const test_uint = [_][]const u8{
     &Serializer.serializeInt(u8, 250),
@@ -25,6 +28,9 @@ const test_uint = [_][]const u8{
     &Serializer.serializeInt(u128, 28446744073709551615),
     &Serializer.serializeInt(u256, 340282366920938463463375607431768211456),
     &Serializer.serializeInt(u512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
+    &Serializer.serializeInt(u6, 30),
+    &Serializer.serializeInt(u38, 9123424),
+    &Serializer.serializeInt(u80, 5294967295),
 };
 
 const test_float = [_][]const u8{
@@ -61,7 +67,7 @@ pub fn main() !void {
     for (test_float) |in| {
         std.debug.print("-------------------------------------------------\n", .{});
         std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(f128, allocator, in, .{ .assert_floats = false })});
+        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(f128, allocator, in, .{ .float_behavior = .widen })});
         buf = undefined;
     }
 

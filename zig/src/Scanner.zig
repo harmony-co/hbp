@@ -58,6 +58,10 @@ pub fn next(self: *Scanner) !Token {
                 => {
                     continue :state .int;
                 },
+                .arbitrary_signed_int => {
+                    self.cursor += 1;
+                    continue :state .arbitrary_int;
+                },
                 .unsigned_int_8,
                 .unsigned_int_16,
                 .unsigned_int_32,
@@ -67,6 +71,10 @@ pub fn next(self: *Scanner) !Token {
                 .unsigned_int_512,
                 => {
                     continue :state .uint;
+                },
+                .arbitrary_unsigned_int => {
+                    self.cursor += 1;
+                    continue :state .arbitrary_uint;
                 },
                 .half_float => {
                     self.cursor += 3;
@@ -114,11 +122,35 @@ pub fn next(self: *Scanner) !Token {
                 .view = self.input[value_start..self.cursor],
             } };
         },
+        .arbitrary_int => {
+            const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+            self.cursor += 2;
+            const value_start = self.cursor;
+            self.cursor += byte_length;
+            self.state = .post_value;
+
+            return .{ .int = .{
+                .signedness = .signed,
+                .view = self.input[value_start..self.cursor],
+            } };
+        },
         .uint => {
             const marker = self.input[self.cursor];
             self.cursor += 1;
 
             const byte_length = try calculateIntegerByteLength(marker);
+            const value_start = self.cursor;
+            self.cursor += byte_length;
+            self.state = .post_value;
+
+            return .{ .int = .{
+                .signedness = .unsigned,
+                .view = self.input[value_start..self.cursor],
+            } };
+        },
+        .arbitrary_uint => {
+            const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+            self.cursor += 2;
             const value_start = self.cursor;
             self.cursor += byte_length;
             self.state = .post_value;
@@ -237,7 +269,9 @@ pub const State = enum {
     marker,
     post_value,
     int,
+    arbitrary_int,
     uint,
+    arbitrary_uint,
 };
 
 pub const Token = union(enum) {

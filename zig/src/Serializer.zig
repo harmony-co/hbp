@@ -29,7 +29,7 @@ fn calculateMarker(comptime T: type) []const u8 {
                     128 => &.{base + 4},
                     256 => &.{base + 5},
                     512 => &.{base + 6},
-                    else => |bits| &[_]u8{base + 0x0F} ++ &@as([2]u8, @bitCast(if (native_endian == .big) bits else @byteSwap(bits))),
+                    else => |bits| &[_]u8{base + 0x0F} ++ &@as([2]u8, @bitCast(std.mem.nativeToBig(u16, @divExact(bits, 8)))),
                 };
             },
             .float => |f| {
