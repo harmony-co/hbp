@@ -1,4 +1,6 @@
-export function fHex(hex: number): string {
+import type { SignedIntMarkers, UnsignedIntMarkers } from "./index.js";
+
+export function fHex(hex: SignedIntMarkers | UnsignedIntMarkers): string {
     return `0x${hex.toString(16).toUpperCase()}`;
 }
 
