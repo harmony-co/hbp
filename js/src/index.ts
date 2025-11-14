@@ -163,19 +163,22 @@ type Flatten<
         : [...Acc, F]>
     : Acc;
 
-type Byte = IntRange<0, 255>;
+type Byte = IntRange<0x00, 0xFF>;
 
-/// Markers
-type NullMarker = [Extract<Marker, Marker.null>];
+/// Null
+export type NullMarker = Extract<Marker, Marker.null>;
+type NullSpec = [NullMarker];
 
-type BooleanMarkers = [Extract<
+/// Boolean
+export type BooleanMarker = Extract<
     Marker,
     | Marker.false
     | Marker.true
->];
+>;
+type BooleanSpec = [BooleanMarker];
 
-/// Signed Integers
-export type SignedIntMarkers = Extract<
+/// Signed Integer
+export type SignedIntMarker = Extract<
     Marker,
     | IntRange<Marker.signed_int_8, Marker.signed_int_512>
     | Marker.signed_int_arbitrary
@@ -199,8 +202,8 @@ type SignedIntSpec =
     | SignedIntFixedSpecs
     | SignedIntArbitrarySpec;
 
-/// Unsigned Integers
-export type UnsignedIntMarkers = Extract<
+/// Unsigned Integer
+export type UnsignedIntMarker = Extract<
     Marker,
     | IntRange<Marker.unsigned_int_8, Marker.unsigned_int_512>
     | Marker.unsigned_int_arbitrary
@@ -225,7 +228,7 @@ type UnsignedIntSpec =
     | UnsignedIntArbitrarySpec;
 
 /// Floating Point
-type FloatMarkers = Extract<
+export type FloatMarker = Extract<
     Marker,
     | IntRange<Marker.float_half, Marker.float_octuple>
     | Marker.float_brain
@@ -245,8 +248,8 @@ type FloatSpec = {
     [K in keyof FloatByteLength]: [K, ...FixedLengthBuffer<Byte, FloatByteLength[K]>];
 }[keyof FloatByteLength];
 
-/// Decimals
-type DecimalMarkers = Extract<
+/// Decimal
+export type DecimalMarker = Extract<
     Marker,
     | IntRange<Marker.decimal_32, Marker.decimal_128>
 >;
@@ -260,7 +263,7 @@ type DecimalSpec = {
 }[keyof DecimalByteLength];
 
 /// Tuple
-type TupleMarkers = Extract<
+export type TupleMarker = Extract<
     Marker,
     | IntRange<Marker.tuple_0, Marker.tuple_15>
     | IntRange<Marker.tuple_255, Marker.tuple_4G>
@@ -299,8 +302,8 @@ type TupleSpec =
     | SmallTupleSpec
     | LongTupleSpec;
 
-/// Vectors
-type VectorMarkers = Extract<
+/// Vector
+export type VectorMarker = Extract<
     Marker,
     | IntRange<Marker.vector_0, Marker.vector_15>
     | IntRange<Marker.vector_255, Marker.vector_4G>
@@ -341,7 +344,7 @@ type VectorSpec =
     | LongVectorSpec;
 
 /// Dictionary
-type DictMarkers = Extract<
+export type DictMarker = Extract<
     Marker,
     | IntRange<Marker.dict_255, Marker.dict_4G>
 >;
@@ -360,7 +363,7 @@ type DictSpec = {
 }[keyof DictCapacity];
 
 /// Map
-type MapMarkers = Extract<
+export type MapMarker = Extract<
     Marker,
     | IntRange<Marker.map_255, Marker.map_4G>
 >;
@@ -378,7 +381,7 @@ type MapSpec = {
 }[keyof MapCapacity];
 
 /// Meta Data Types
-type MetaMarkers = Extract<
+export type MetaMarker = Extract<
     Marker,
     | Marker.string
     | Marker.vector
@@ -426,29 +429,13 @@ type EnumSpec = [
 //     ...StringSpec
 // ];
 
-export type Markers =
-    | NullMarker
-    | BooleanMarkers
-    | SignedIntMarkers
-    | UnsignedIntMarkers
-    | FloatMarkers
-    | DecimalMarkers
-    | TupleMarkers
-    | VectorMarkers
-    | DictMarkers
-    | MapMarkers
-    | MetaMarkers;
-
 type PrimitiveMarkerSpecs =
-    | NullMarker
-    | BooleanMarkers
+    | NullSpec
+    | BooleanSpec
     | SignedIntSpec
     | UnsignedIntSpec
     | FloatSpec
-    | DecimalSpec
-    // | StringSpec
-    | EnumSpec;
-    // | ErrorSpec;
+    | DecimalSpec;
 
 type MarkerSpecs =
     | PrimitiveMarkerSpecs
@@ -456,6 +443,9 @@ type MarkerSpecs =
     | VectorSpec
     | DictSpec
     | MapSpec
+    | EnumSpec
+    // | StringSpec
+    // | ErrorSpec
     | OptionalSpec;
 
 export type HBPFrame = Prepend<MarkerSpecs, typeof HBP_VERSION>;
