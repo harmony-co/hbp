@@ -1,3 +1,5 @@
+import type { SignedIntMarker, UnsignedIntMarker } from "./index.js";
+
 import { fromBig } from "./util.js";
 import { HBP_VERSION, Marker } from "./index.js";
 
@@ -9,7 +11,7 @@ export function serializeBool(value: boolean): Buffer {
     return Buffer.from([HBP_VERSION, value ? Marker.true : Marker.false]);
 }
 
-export function serializeInt(type: Marker, value: bigint): Buffer {
+export function serializeInt(type: SignedIntMarker | UnsignedIntMarker, value: bigint): Buffer {
     let bits: number;
     const isArbitrary = (type & 0x0F) === 0x0F;
     if (isArbitrary) {
