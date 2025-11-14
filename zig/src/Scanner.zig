@@ -211,7 +211,17 @@ pub fn next(self: *Scanner) !Token {
                     self.state = .marker;
                     return .optional;
                 },
+                .@"enum" => {
+                    self.cursor += 1;
+                    if (self.input[self.cursor] == @intFromEnum(MarkerType.arbitrary_unsigned_int)) {
+                        self.cursor += 1;
+                        self.state = .arbitrary_uint;
+                    } else {
+                        self.state = .uint;
+                    }
 
+                    return .@"enum";
+                },
                 else => return error.NotImplemented,
             }
         },
@@ -377,6 +387,7 @@ pub const TokenType = enum {
     float,
     tuple,
     optional,
+    @"enum",
     eos,
 };
 
@@ -395,6 +406,7 @@ pub const Token = union(TokenType) {
     },
     tuple: u32,
     optional,
+    @"enum",
     eos,
 };
 

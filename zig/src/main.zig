@@ -97,6 +97,12 @@ pub fn main() !void {
     std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in5)});
     std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in5, .{ .non_typed_optionals = .allow })});
     buf = undefined;
+
+    std.debug.print("-------------------------------------------------\n", .{});
+    const in6 = &.{ 0x01, 0xF1, 0x20, 0x00 };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in6)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(enum { TEST }, in6, .{})});
+    buf = undefined;
 }
 
 fn readableOutput(buffer: []u8, input: []const u8) []const u8 {

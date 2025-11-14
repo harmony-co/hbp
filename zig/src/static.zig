@@ -86,6 +86,13 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
                 else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, options) else error.UnexpectedToken,
             }
         },
+        .@"enum" => |enumInfo| {
+            if (try scanner.next() != .@"enum") return error.UnexpectedToken;
+            const token = try scanner.next();
+            if (token != .int) return error.UnexpectedToken;
+
+            return @enumFromInt(sliceToInt(enumInfo.tag_type, token.int.view));
+        },
         .@"struct" => |structInfo| {
             if (structInfo.is_tuple) {
                 const token = try scanner.next();
@@ -106,16 +113,24 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
     }
 }
 
-fn sliceToInt(comptime T: type, slice: []const u8) T {
-    const alignedType = std.math.ByteAlignedInt(T);
-    const byte_length = @divExact(@typeInfo(alignedType).int.bits, 8);
-    assert(slice.len <= byte_length);
+inline fn alignIntegerType(comptime T: type) type {
+    const int = @typeInfo(T).int;
+    // 0 bit integers mostly happen when using enums with 1 single element
+    // We require every type to be at least 1 byte long to be parsed
+    if (int.bits == 0) return std.meta.Int(int.signedness, 8);
+    return std.math.ByteAlignedInt(T);
+}
+
+fn sliceToInt(comptime T: type, slice: []const u8) alignIntegerType(T) {
+    const N = alignIntegerType(T);
+    const byte_length = @divExact(@typeInfo(N).int.bits, 8);
 
     if (slice.len < byte_length) {
         var buf = std.mem.zeroes([byte_length]u8);
         @memcpy(buf[byte_length - slice.len ..], slice);
-        return std.mem.readInt(alignedType, &buf, .big);
+        return std.mem.readInt(N, &buf, .big);
     }
 
-    return std.mem.readInt(alignedType, slice[0..byte_length], .big);
+    assert(slice.len == byte_length);
+    return std.mem.readInt(N, slice[0..byte_length], .big);
 }

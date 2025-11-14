@@ -7,7 +7,7 @@ const expect = std.testing.expect;
 const eql = std.mem.eql;
 
 test "null" {
-    var scanner: Scanner = .init(std.testing.allocator, &.{ 0x01, 0x00 });
+    var scanner: Scanner = .init(&.{ 0x01, 0x00 });
     defer scanner.deinit();
 
     try expectNext(&scanner, .{ .version = 1 });
@@ -16,14 +16,14 @@ test "null" {
 }
 
 test "bool" {
-    var scanner: Scanner = .init(std.testing.allocator, &.{ 0x01, 0x01 });
+    var scanner: Scanner = .init(&.{ 0x01, 0x01 });
 
     try expectNext(&scanner, .{ .version = 1 });
     try expectNext(&scanner, .false);
     try expectNext(&scanner, .eos);
 
     scanner.deinit();
-    scanner = .init(std.testing.allocator, &.{ 0x01, 0x02 });
+    scanner = .init(&.{ 0x01, 0x02 });
     defer scanner.deinit();
 
     try expectNext(&scanner, .{ .version = 1 });
@@ -67,7 +67,7 @@ test "int" {
     };
 
     for (test_input, 0..) |in, i| {
-        var scanner: Scanner = .init(std.testing.allocator, in);
+        var scanner: Scanner = .init(in);
         defer scanner.deinit();
 
         const out = test_output[i];
@@ -92,6 +92,9 @@ fn expectNext(scanner: *Scanner, expected_token: Scanner.Token) !void {
         .null,
         .false,
         .true,
+        .tuple,
+        .optional,
+        .@"enum",
         .eos,
         => {},
     }
