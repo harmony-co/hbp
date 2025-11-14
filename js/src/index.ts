@@ -1,17 +1,17 @@
 export * from "./Deserialzer.js";
 export * from "./Serializer.js";
 
-export const HBP_VERSION = 0x01;
+export const HBPVersion = 0x01;
 
 export const enum Marker {
     /* eslint-disable @typescript-eslint/naming-convention */
     null = 0x00,
 
-    /// Booleans
+    /// Boolean
     false = 0x01,
     true,
 
-    /// Signed Integers
+    /// Signed Integer
     signed_int_8 = 0x10,
     signed_int_16,
     signed_int_32,
@@ -21,7 +21,7 @@ export const enum Marker {
     signed_int_512,
     signed_int_arbitrary = 0x1F,
 
-    /// Unsigned Integers
+    /// Unsigned Integer
     unsigned_int_8 = 0x20,
     unsigned_int_16,
     unsigned_int_32,
@@ -51,7 +51,7 @@ export const enum Marker {
     /** @see [Brain Floating Point](https://en.wikipedia.org/wiki/Bfloat16_floating-point_format) */
     float_brain = 0x3F,
 
-    /// Decimals
+    /// Decimal
     /** @see [IEEE 754 Decimal32](https://en.wikipedia.org/wiki/Decimal32_floating-point_format) */
     decimal_32 = 0x3A,
     /** @see [IEEE 754 Decimal64](https://en.wikipedia.org/wiki/Decimal64_floating-point_format) */
@@ -59,7 +59,7 @@ export const enum Marker {
     /** @see [IEEE 754 Decimal128](https://en.wikipedia.org/wiki/Decimal128_floating-point_format) */
     decimal_128,
 
-    /// Array
+    /// Tuple
     /** Empty tuple */
     tuple_0 = 0x70,
     tuple_1,
@@ -118,10 +118,8 @@ export const enum Marker {
     map_4G,
 
     /// Meta Data Types
-    string = 0xE0,
-    vector = 0xE3,
-    optional = 0xF0,
-    enum = 0xF1,
+    optional = 0xE0,
+    enum = 0xE1,
     error = 0xFF
 
     /* eslint-enable @typescript-eslint/naming-convention */
@@ -152,6 +150,7 @@ type FixedLengthBuffer<T, L extends number> =
     number extends L ? Array<T> : BuildTuple<T, L>;
 
 type Prepend<T, U> = T extends Array<unknown> ? [U, ...T] : never;
+type Tail<M extends number, T extends Array<unknown>> = T extends [M, ...infer R] ? R : never;
 
 /** @see https://stackoverflow.com/a/59833759/28282697 */
 type Flatten<
@@ -286,17 +285,17 @@ type SmallTupleCapacity = {
     [Marker.tuple_14]: 14,
     [Marker.tuple_15]: 15
 };
-type LongTupleCapacity = {
-    [Marker.tuple_255]: 255,
-    [Marker.tuple_65535]: 65535,
-    [Marker.tuple_4G]: 4_294_967_295
+type LongTupleExtraBytes = {
+    [Marker.tuple_255]: 1,
+    [Marker.tuple_65535]: 2,
+    [Marker.tuple_4G]: 4
 };
 type SmallTupleSpec = {
     [K in keyof SmallTupleCapacity]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallTupleCapacity[K]>];
 }[keyof SmallTupleCapacity];
 type LongTupleSpec = {
-    [K in keyof LongTupleCapacity]: [K, ...Array<PrimitiveMarkerSpecs>, LongTupleCapacity[K]];
-}[keyof LongTupleCapacity];
+    [K in keyof LongTupleExtraBytes]: [K, ...FixedLengthBuffer<Byte, LongTupleExtraBytes[K]>, ...Array<PrimitiveMarkerSpecs>];
+}[keyof LongTupleExtraBytes];
 
 type TupleSpec =
     | SmallTupleSpec
@@ -326,18 +325,21 @@ type SmallVectorCapacity = {
     [Marker.vector_14]: 14,
     [Marker.vector_15]: 15
 };
-type LongVectorCapacity = {
-    [Marker.vector_255]: 255,
-    [Marker.vector_65535]: 65535,
-    [Marker.vector_4G]: 4_294_967_295
+type LongVectorExtraBytes = {
+    [Marker.vector_255]: 1,
+    [Marker.vector_65535]: 2,
+    [Marker.vector_4G]: 4
 };
-// type VectorCapacity = SmallVectorCapacity & LongVectorCapacity;
 type SmallVectorSpec = {
-    [K in keyof SmallVectorCapacity]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallVectorCapacity[K]>];
+    [K in keyof SmallVectorCapacity]: {
+        [M in PrimitiveMarker]: [K, M, ...Flatten<FixedLengthBuffer<Tail<M, PrimitiveMarkerSpecs>, SmallVectorCapacity[K]>>]
+    }[PrimitiveMarker];
 }[keyof SmallVectorCapacity];
 type LongVectorSpec = {
-    [K in keyof LongVectorCapacity]: [K, ...Array<PrimitiveMarkerSpecs>, LongVectorCapacity[K]];
-}[keyof LongVectorCapacity];
+    [K in keyof LongVectorExtraBytes]: {
+        [M in PrimitiveMarker]: [K, M, ...FixedLengthBuffer<Byte, LongVectorExtraBytes[K]>, ...Tail<M, PrimitiveMarkerSpecs>]
+    }[PrimitiveMarker];
+}[keyof LongVectorExtraBytes];
 
 type VectorSpec =
     | SmallVectorSpec
@@ -348,49 +350,58 @@ export type DictMarker = Extract<
     Marker,
     | IntRange<Marker.dict_255, Marker.dict_4G>
 >;
-type DictCapacity = {
-    [Marker.dict_255]: 255,
-    [Marker.dict_65535]: 65535,
-    [Marker.dict_4G]: 4_294_967_295
+type DictExtraBytes = {
+    [Marker.dict_255]: 1,
+    [Marker.dict_65535]: 2,
+    [Marker.dict_4G]: 4
 };
 
 type DictSpec = {
-    [K in keyof DictCapacity]: [K, number,
-        ...Flatten<
-            [Marker.string, CharacterEncoding, PrimitiveMarkerSpecs]
-        >
+    [K in keyof DictExtraBytes]: [K, ...FixedLengthBuffer<Byte, DictExtraBytes[K]>,
+        ...Flatten<[UTF8StringSpec, PrimitiveMarkerSpecs]>
     ];
-}[keyof DictCapacity];
+}[keyof DictExtraBytes];
 
 /// Map
 export type MapMarker = Extract<
     Marker,
     | IntRange<Marker.map_255, Marker.map_4G>
 >;
-type MapCapacity = {
-    [Marker.map_255]: 255,
-    [Marker.map_65535]: 65535,
-    [Marker.map_4G]: 4_294_967_295
+type MapExtraBytes = {
+    [Marker.map_255]: 1,
+    [Marker.map_65535]: 2,
+    [Marker.map_4G]: 4
 };
 type MapSpec = {
-    [K in keyof MapCapacity]: [K, number,
-        ...Flatten<
-            [PrimitiveMarkerSpecs, PrimitiveMarkerSpecs]
-        >
+    [K in keyof MapExtraBytes]: [K, ...FixedLengthBuffer<Byte, MapExtraBytes[K]>,
+        ...Flatten<[Exclude<
+            PrimitiveMarkerSpecs,
+            | NullSpec
+            | BooleanSpec
+        >, PrimitiveMarkerSpecs]>
     ];
-}[keyof MapCapacity];
-
-/// Meta Data Types
-export type MetaMarker = Extract<
-    Marker,
-    | Marker.string
-    | Marker.vector
-    | Marker.optional
-    | Marker.enum
-    | Marker.error
->;
+}[keyof MapExtraBytes];
 
 /// String
+type UTF8StringCapacity = {
+    [0x60]: 1,
+    [0x61]: 2,
+    [0x62]: 3,
+    [0x63]: 4,
+    [0x64]: 5,
+    [0x65]: 6,
+    [0x66]: 7,
+    [0x67]: 8
+};
+type UTF8StringSpec = {
+    [K in keyof UTF8StringCapacity]: [K, ...FixedLengthBuffer<Byte, UTF8StringCapacity[K]>, ...Array<Byte>]
+}[keyof UTF8StringCapacity];
+type ArbitraryStringSpec = [0x6F, CharacterEncoding, Byte, Byte, ...Array<Byte>];
+
+type StringSpec =
+    | UTF8StringSpec
+    | ArbitraryStringSpec;
+
 // type UTFCharBytes<E extends CharacterEncoding> = E extends CharacterEncoding.utf8
 //     ? [Byte]
 //     : [Byte, Byte];
@@ -411,25 +422,41 @@ export type MetaMarker = Extract<
 //     }[CharacterEncoding]
 // }[keyof VectorCapacity];
 
+/// Meta Data Types
+export type MetaMarker = Extract<
+    Marker,
+    | Marker.optional
+    | Marker.enum
+    | Marker.error
+>;
+
 /// Optional
-type OptionalSpec = [
-    Marker.optional,
-    ...PrimitiveMarkerSpecs
-];
+type OptionalSpec = Prepend<
+    PrimitiveMarkerSpecs,
+    Marker.optional
+>;
 
 /// Enum
-type EnumSpec = [
-    Marker.enum,
-    ...UnsignedIntFixedSpecs
-];
+type EnumSpec = Prepend<
+    UnsignedIntFixedSpecs,
+    Marker.enum
+>;
 
 /// Error
-// type ErrorSpec = [
-//     Marker.error,
-//     ...StringSpec
-// ];
+type ErrorSpec = Prepend<
+    UTF8StringSpec,
+    Marker.error
+>;
 
-type PrimitiveMarkerSpecs =
+export type PrimitiveMarker =
+    | NullMarker
+    | BooleanMarker
+    | SignedIntMarker
+    | UnsignedIntMarker
+    | FloatMarker
+    | DecimalMarker;
+
+export type PrimitiveMarkerSpecs =
     | NullSpec
     | BooleanSpec
     | SignedIntSpec
@@ -437,16 +464,16 @@ type PrimitiveMarkerSpecs =
     | FloatSpec
     | DecimalSpec;
 
-type MarkerSpecs =
+export type MarkerSpecs =
     | PrimitiveMarkerSpecs
     | TupleSpec
     | VectorSpec
     | DictSpec
     | MapSpec
     | EnumSpec
-    // | StringSpec
-    // | ErrorSpec
+    | StringSpec
+    | ErrorSpec
     | OptionalSpec;
 
-export type HBPFrame = Prepend<MarkerSpecs, typeof HBP_VERSION>;
+export type HBPFrame = [typeof HBPVersion, ...MarkerSpecs];
 
