@@ -12,22 +12,21 @@ pub const ParseOptions = struct {
     } = .preserve,
 };
 
-pub fn parseFromSlice(comptime T: type, gpa: std.mem.Allocator, slice: []const u8, comptime options: ParseOptions) !T {
-    var scanner: Scanner = .init(gpa, slice);
+pub fn parseFromSlice(comptime T: type, slice: []const u8, comptime options: ParseOptions) !T {
+    var scanner: Scanner = .init(slice);
     defer scanner.deinit();
 
-    return parseFromTokenSource(T, gpa, &scanner, options);
+    return parseFromTokenSource(T, &scanner, options);
 }
 
-pub fn parseFromTokenSource(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, comptime options: ParseOptions) !T {
+pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
     assert(try scanner.next() == .version);
-    const value = try innerParse(T, gpa, scanner, options);
+    const value = try innerParse(T, scanner, options);
     assert(try scanner.next() == .eos);
     return value;
 }
 
-pub fn innerParse(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, comptime options: ParseOptions) !T {
-    _ = gpa;
+pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
     switch (@typeInfo(T)) {
         .bool => {
             return switch (try scanner.next()) {
@@ -38,7 +37,7 @@ pub fn innerParse(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, c
         },
         .int => |int| {
             const token = try scanner.next();
-            if (token != Scanner.Token.int) return error.UnexpectedToken;
+            if (token != .int) return error.UnexpectedToken;
             if (comptime !options.ignore_integer_signedness) {
                 if (token.int.signedness != int.signedness) return error.WrongIntegerType;
             }
@@ -47,7 +46,7 @@ pub fn innerParse(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, c
         },
         .float => |float| {
             const token = try scanner.next();
-            if (token != Scanner.Token.float) return error.UnexpectedToken;
+            if (token != .float) return error.UnexpectedToken;
             if (comptime options.float_behavior != .widen) {
                 if (float.bits != token.float.bits) return error.CannotWidenFloat;
             }
@@ -61,6 +60,21 @@ pub fn innerParse(comptime T: type, gpa: std.mem.Allocator, scanner: *Scanner, c
                 128 => std.mem.bytesToValue(f128, token.float.view),
                 else => unreachable,
             });
+        },
+        .@"struct" => |structInfo| {
+            if (structInfo.is_tuple) {
+                const token = try scanner.next();
+                if (token != .tuple) return error.UnexpectedToken;
+                assert(structInfo.fields.len == token.tuple);
+
+                var r: T = undefined;
+
+                inline for (structInfo.fields, 0..) |field, i| {
+                    r[i] = try innerParse(field.type, scanner, options);
+                }
+
+                return r;
+            }
         },
         .comptime_int, .comptime_float => error.IncompatibleTypes,
         else => return error.TODO,

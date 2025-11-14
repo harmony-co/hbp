@@ -1,25 +1,20 @@
 const std = @import("std");
 
-const BitStack = std.BitStack;
-
 const Scanner = @This();
 
-stack: BitStack,
 state: State = .version,
 value_start: usize = undefined,
 input: []const u8 = undefined,
 cursor: usize = 0,
 
 /// Allocator used purely for the bitstack
-pub fn init(gpa: std.mem.Allocator, input: []const u8) Scanner {
+pub fn init(input: []const u8) Scanner {
     return .{
-        .stack = .init(gpa),
         .input = input,
     };
 }
 
 pub fn deinit(self: *Scanner) void {
-    self.stack.deinit();
     self.* = undefined;
 }
 
@@ -109,13 +104,52 @@ pub fn next(self: *Scanner) !Token {
                 },
                 // .octuple_float,
                 // .brain_float,
+                .empty_tuple,
+                .tuple_1,
+                .tuple_2,
+                .tuple_3,
+                .tuple_4,
+                .tuple_5,
+                .tuple_6,
+                .tuple_7,
+                .tuple_8,
+                .tuple_9,
+                .tuple_10,
+                .tuple_11,
+                .tuple_12,
+                .tuple_13,
+                .tuple_14,
+                .tuple_15,
+                => {
+                    const byte_length = self.input[self.cursor] - 0x70;
+                    self.cursor += 1;
+                    return self.parseTupleState(byte_length);
+                },
+                .arbitrary_tuple_1 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToBig(u8, self.input[self.cursor]);
+                    self.cursor += 1;
+                    return self.parseTupleState(byte_length);
+                },
+                .arbitrary_tuple_2 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    self.cursor += 2;
+                    return self.parseTupleState(byte_length);
+                },
+                .arbitrary_tuple_4 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    self.cursor += 4;
+                    return self.parseTupleState(byte_length);
+                },
+
                 else => return error.NotImplemented,
             }
         },
         .int, .uint => {
             const marker = self.input[self.cursor];
             self.cursor += 1;
-
             const byte_length = try calculateIntegerByteLength(marker);
             const value_start = self.cursor;
             self.cursor += byte_length;
@@ -144,10 +178,12 @@ pub fn next(self: *Scanner) !Token {
                 },
             };
         },
-
         .post_value => {
             if (try self.checkEnd()) return .eos;
-            return error.NeedToImplement;
+            // NOTE: If no changes are necessary here after all types have been implemented
+            // remove this and add a simple check to the beginning of `marker` instead.
+            self.state = .marker;
+            continue :state .marker;
         },
     }
 }
@@ -161,11 +197,17 @@ fn calculateIntegerByteLength(marker: u8) !usize {
 }
 
 fn checkEnd(self: *Scanner) !bool {
-    if (self.cursor >= self.input.len) {
-        if (self.stack.bit_len == 0) return true;
-        return error.BufferUnderrun;
-    }
-    return false;
+    return self.cursor >= self.input.len;
+    // if (self.cursor >= self.input.len) {
+    //     if (self.stack.bit_len == 0) return true;
+    //     return error.BufferUnderrun;
+    // }
+    // return false;
+}
+
+fn parseTupleState(self: *Scanner, byte_length: u32) Token {
+    self.state = if (byte_length == 0) .post_value else .marker;
+    return .{ .tuple = byte_length };
 }
 
 pub const MarkerType = enum(u8) {
@@ -200,53 +242,52 @@ pub const MarkerType = enum(u8) {
     decimal_32 = 0x3A,
     decimal_64 = 0x3B,
     decimal_128 = 0x3C,
-    string = 0xE0,
-    vector = 0xE3,
+    empty_tuple = 0x70,
+    tuple_1 = 0x71,
+    tuple_2 = 0x72,
+    tuple_3 = 0x73,
+    tuple_4 = 0x74,
+    tuple_5 = 0x75,
+    tuple_6 = 0x76,
+    tuple_7 = 0x77,
+    tuple_8 = 0x78,
+    tuple_9 = 0x79,
+    tuple_10 = 0x7A,
+    tuple_11 = 0x7B,
+    tuple_12 = 0x7C,
+    tuple_13 = 0x7D,
+    tuple_14 = 0x7E,
+    tuple_15 = 0x7F,
+    arbitrary_tuple_1 = 0xDA,
+    arbitrary_tuple_2 = 0xDB,
+    arbitrary_tuple_4 = 0xDC,
+    empty_vector = 0x80,
+    vector_1 = 0x81,
+    vector_2 = 0x82,
+    vector_3 = 0x83,
+    vector_4 = 0x84,
+    vector_5 = 0x85,
+    vector_6 = 0x86,
+    vector_7 = 0x87,
+    vector_8 = 0x88,
+    vector_9 = 0x89,
+    vector_10 = 0x8A,
+    vector_11 = 0x8B,
+    vector_12 = 0x8C,
+    vector_13 = 0x8D,
+    vector_14 = 0x8E,
+    vector_15 = 0x8F,
+    arbitrary_vector_1 = 0xDD,
+    arbitrary_vector_2 = 0xDE,
+    arbitrary_vector_4 = 0xDF,
+
+    // TODO: Have optimized markers like lists
+    arbitrary_dict_1 = 0xD0,
+    arbitrary_dict_2 = 0xD1,
+    arbitrary_dict_4 = 0xD2,
     optional = 0xF0,
     @"enum" = 0xF1,
     @"error" = 0xFF,
-    empty_array = 0x70,
-    array_1 = 0x71,
-    array_2 = 0x72,
-    array_3 = 0x73,
-    array_4 = 0x74,
-    array_5 = 0x75,
-    array_6 = 0x76,
-    array_7 = 0x77,
-    array_8 = 0x78,
-    array_9 = 0x79,
-    array_10 = 0x7A,
-    array_11 = 0x7B,
-    array_12 = 0x7C,
-    array_13 = 0x7D,
-    array_14 = 0x7E,
-    array_15 = 0x7F,
-    dyn_array_1 = 0xDA,
-    dyn_array_2 = 0xDB,
-    dyn_array_4 = 0xDC,
-    list_1 = 0x81,
-    list_2 = 0x82,
-    list_3 = 0x83,
-    list_4 = 0x84,
-    list_5 = 0x85,
-    list_6 = 0x86,
-    list_7 = 0x87,
-    list_8 = 0x88,
-    list_9 = 0x89,
-    list_10 = 0x8A,
-    list_11 = 0x8B,
-    list_12 = 0x8C,
-    list_13 = 0x8D,
-    list_14 = 0x8E,
-    list_15 = 0x8F,
-    dyn_list_1 = 0xDD,
-    dyn_list_2 = 0xDE,
-    dyn_list_4 = 0xDF,
-
-    // TODO: Have optimized markers like lists
-    dyn_dict_1 = 0xD0,
-    dyn_dict_2 = 0xD1,
-    dyn_dict_4 = 0xD2,
 };
 
 pub const State = enum {
@@ -272,6 +313,8 @@ pub const Token = union(enum) {
         bits: u16,
         view: []const u8,
     },
+    tuple: u32,
+
     eos,
 };
 
