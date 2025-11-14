@@ -8,5 +8,5 @@
         "Minifloat",
         "signedness"
     ],
-    "zig.zls.enableBuildOnSave": true
+    "zig.buildOnSaveProvider": "zls"
 }
