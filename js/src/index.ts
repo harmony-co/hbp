@@ -1,5 +1,5 @@
-export * from "./Deserialzer.js"
-export * from "./Serializer.js"
+export * from "./Deserialzer.js";
+export * from "./Serializer.js";
 
 export const HBP_VERSION = 0x01;
 
@@ -60,61 +60,61 @@ export const enum Marker {
     decimal_128,
 
     /// Array
-    /** Empty array */
-    array_0 = 0x70,
-    array_1,
-    array_2,
-    array_3,
-    array_4,
-    array_5,
-    array_6,
-    array_7,
-    array_8,
-    array_9,
-    array_10,
-    array_11,
-    array_12,
-    array_13,
-    array_14,
-    array_15,
-    array_256 = 0xDA,
-    array_65536,
-    /** 4,294,967,296 Array elements */
-    array_4G,
+    /** Empty tuple */
+    tuple_0 = 0x70,
+    tuple_1,
+    tuple_2,
+    tuple_3,
+    tuple_4,
+    tuple_5,
+    tuple_6,
+    tuple_7,
+    tuple_8,
+    tuple_9,
+    tuple_10,
+    tuple_11,
+    tuple_12,
+    tuple_13,
+    tuple_14,
+    tuple_15,
+    tuple_255 = 0xDA,
+    tuple_65535,
+    /** 4,294,967,295 Tuple elements */
+    tuple_4G,
 
-    /// List
-    /** Empty list */
-    list_0 = 0x80,
-    list_1,
-    list_2,
-    list_3,
-    list_4,
-    list_5,
-    list_6,
-    list_7,
-    list_8,
-    list_9,
-    list_10,
-    list_11,
-    list_12,
-    list_13,
-    list_14,
-    list_15,
-    list_256 = 0xDD,
-    list_65536,
-    /** 4,294,967,296 List elements */
-    list_4G,
+    /// Vector
+    /** Empty vector */
+    vector_0 = 0x80,
+    vector_1,
+    vector_2,
+    vector_3,
+    vector_4,
+    vector_5,
+    vector_6,
+    vector_7,
+    vector_8,
+    vector_9,
+    vector_10,
+    vector_11,
+    vector_12,
+    vector_13,
+    vector_14,
+    vector_15,
+    vector_255 = 0xDD,
+    vector_65535,
+    /** 4,294,967,295 Vector elements */
+    vector_4G,
 
     /// Dictionary
-    dict_256 = 0xD0,
-    dict_65536,
-    /** 4,294,967,296 Dictionary elements */
+    dict_255 = 0xD0,
+    dict_65535,
+    /** 4,294,967,295 Dictionary elements */
     dict_4G,
 
     /// Map
-    map_256 = 0xD3,
-    map_65536,
-    /** 4,294,967,296 Map elements */
+    map_255 = 0xD3,
+    map_65535,
+    /** 4,294,967,295 Map elements */
     map_4G,
 
     /// Meta Data Types
@@ -180,7 +180,7 @@ export type SignedIntMarkers = Extract<
     | IntRange<Marker.signed_int_8, Marker.signed_int_512>
     | Marker.signed_int_arbitrary
 >;
-type SignedIntByteLengths = {
+type SignedIntByteLength = {
     [Marker.signed_int_8]: 1,
     [Marker.signed_int_16]: 2,
     [Marker.signed_int_32]: 4,
@@ -190,8 +190,8 @@ type SignedIntByteLengths = {
     [Marker.signed_int_512]: 64
 };
 type SignedIntFixedSpecs = {
-    [K in keyof SignedIntByteLengths]: [K, ...FixedLengthBuffer<Byte, SignedIntByteLengths[K]>];
-}[keyof SignedIntByteLengths];
+    [K in keyof SignedIntByteLength]: [K, ...FixedLengthBuffer<Byte, SignedIntByteLength[K]>];
+}[keyof SignedIntByteLength];
 type SignedIntArbitrarySpec = [
     Marker.signed_int_arbitrary, ...FixedLengthBuffer<Byte, 2>, ...Array<Byte>
 ];
@@ -205,7 +205,7 @@ export type UnsignedIntMarkers = Extract<
     | IntRange<Marker.unsigned_int_8, Marker.unsigned_int_512>
     | Marker.unsigned_int_arbitrary
 >;
-type UnsignedIntByteLengths = {
+type UnsignedIntByteLength = {
     [Marker.unsigned_int_8]: 1,
     [Marker.unsigned_int_16]: 2,
     [Marker.unsigned_int_32]: 4,
@@ -215,8 +215,8 @@ type UnsignedIntByteLengths = {
     [Marker.unsigned_int_512]: 64
 };
 type UnsignedIntFixedSpecs = {
-    [K in keyof UnsignedIntByteLengths]: [K, ...FixedLengthBuffer<Byte, UnsignedIntByteLengths[K]>];
-}[keyof UnsignedIntByteLengths];
+    [K in keyof UnsignedIntByteLength]: [K, ...FixedLengthBuffer<Byte, UnsignedIntByteLength[K]>];
+}[keyof UnsignedIntByteLength];
 type UnsignedIntArbitrarySpec = [
     Marker.unsigned_int_arbitrary, ...FixedLengthBuffer<Byte, 2>, ...Array<Byte>
 ];
@@ -230,7 +230,7 @@ type FloatMarkers = Extract<
     | IntRange<Marker.float_half, Marker.float_octuple>
     | Marker.float_brain
 >;
-type FloatByteLengths = {
+type FloatByteLength = {
     [Marker.float_half]: 2,
     [Marker.float_mini]: 3,
     [Marker.float_single]: 4,
@@ -242,140 +242,140 @@ type FloatByteLengths = {
     [Marker.float_brain]: 2
 };
 type FloatSpec = {
-    [K in keyof FloatByteLengths]: [K, ...FixedLengthBuffer<Byte, FloatByteLengths[K]>];
-}[keyof FloatByteLengths];
+    [K in keyof FloatByteLength]: [K, ...FixedLengthBuffer<Byte, FloatByteLength[K]>];
+}[keyof FloatByteLength];
 
 /// Decimals
 type DecimalMarkers = Extract<
     Marker,
     | IntRange<Marker.decimal_32, Marker.decimal_128>
 >;
-type DecimalByteLengths = {
+type DecimalByteLength = {
     [Marker.decimal_32]: 4,
     [Marker.decimal_64]: 8,
     [Marker.decimal_128]: 16
 };
 type DecimalSpec = {
-    [K in keyof DecimalByteLengths]: [K, ...FixedLengthBuffer<Byte, DecimalByteLengths[K]>];
-}[keyof DecimalByteLengths];
+    [K in keyof DecimalByteLength]: [K, ...FixedLengthBuffer<Byte, DecimalByteLength[K]>];
+}[keyof DecimalByteLength];
 
-/// Array
-type ArrayMarkers = Extract<
+/// Tuple
+type TupleMarkers = Extract<
     Marker,
-    | IntRange<Marker.array_0, Marker.array_15>
-    | IntRange<Marker.array_256, Marker.array_4G>
+    | IntRange<Marker.tuple_0, Marker.tuple_15>
+    | IntRange<Marker.tuple_255, Marker.tuple_4G>
 >;
-type SmallArrayLengths = {
-    [Marker.array_0]: 0,
-    [Marker.array_1]: 1,
-    [Marker.array_2]: 2,
-    [Marker.array_3]: 3,
-    [Marker.array_4]: 4,
-    [Marker.array_5]: 5,
-    [Marker.array_6]: 6,
-    [Marker.array_7]: 7,
-    [Marker.array_8]: 8,
-    [Marker.array_9]: 9,
-    [Marker.array_10]: 10,
-    [Marker.array_11]: 11,
-    [Marker.array_12]: 12,
-    [Marker.array_13]: 13,
-    [Marker.array_14]: 14,
-    [Marker.array_15]: 15
+type SmallTupleCapacity = {
+    [Marker.tuple_0]: 0,
+    [Marker.tuple_1]: 1,
+    [Marker.tuple_2]: 2,
+    [Marker.tuple_3]: 3,
+    [Marker.tuple_4]: 4,
+    [Marker.tuple_5]: 5,
+    [Marker.tuple_6]: 6,
+    [Marker.tuple_7]: 7,
+    [Marker.tuple_8]: 8,
+    [Marker.tuple_9]: 9,
+    [Marker.tuple_10]: 10,
+    [Marker.tuple_11]: 11,
+    [Marker.tuple_12]: 12,
+    [Marker.tuple_13]: 13,
+    [Marker.tuple_14]: 14,
+    [Marker.tuple_15]: 15
 };
-type LongArrayLengths = {
-    [Marker.array_256]: 256,
-    [Marker.array_65536]: 65536,
-    [Marker.array_4G]: 4_294_967_296
+type LongTupleCapacity = {
+    [Marker.tuple_255]: 255,
+    [Marker.tuple_65535]: 65535,
+    [Marker.tuple_4G]: 4_294_967_295
 };
-type SmallArraySpec = {
-    [K in keyof SmallArrayLengths]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallArrayLengths[K]>];
-}[keyof SmallArrayLengths];
-type LongArraySpec = {
-    [K in keyof LongArrayLengths]: [K, ...Array<PrimitiveMarkerSpecs>, LongArrayLengths[K]];
-}[keyof LongArrayLengths];
+type SmallTupleSpec = {
+    [K in keyof SmallTupleCapacity]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallTupleCapacity[K]>];
+}[keyof SmallTupleCapacity];
+type LongTupleSpec = {
+    [K in keyof LongTupleCapacity]: [K, ...Array<PrimitiveMarkerSpecs>, LongTupleCapacity[K]];
+}[keyof LongTupleCapacity];
 
-type ArraySpec =
-    | SmallArraySpec
-    | LongArraySpec;
+type TupleSpec =
+    | SmallTupleSpec
+    | LongTupleSpec;
 
-/// List
-type ListMarkers = Extract<
+/// Vectors
+type VectorMarkers = Extract<
     Marker,
-    | IntRange<Marker.list_0, Marker.list_15>
-    | IntRange<Marker.list_256, Marker.list_4G>
+    | IntRange<Marker.vector_0, Marker.vector_15>
+    | IntRange<Marker.vector_255, Marker.vector_4G>
 >;
-type SmallListLengths = {
-    [Marker.list_0]: 0,
-    [Marker.list_1]: 1,
-    [Marker.list_2]: 2,
-    [Marker.list_3]: 3,
-    [Marker.list_4]: 4,
-    [Marker.list_5]: 5,
-    [Marker.list_6]: 6,
-    [Marker.list_7]: 7,
-    [Marker.list_8]: 8,
-    [Marker.list_9]: 9,
-    [Marker.list_10]: 10,
-    [Marker.list_11]: 11,
-    [Marker.list_12]: 12,
-    [Marker.list_13]: 13,
-    [Marker.list_14]: 14,
-    [Marker.list_15]: 15
+type SmallVectorCapacity = {
+    [Marker.vector_0]: 0,
+    [Marker.vector_1]: 1,
+    [Marker.vector_2]: 2,
+    [Marker.vector_3]: 3,
+    [Marker.vector_4]: 4,
+    [Marker.vector_5]: 5,
+    [Marker.vector_6]: 6,
+    [Marker.vector_7]: 7,
+    [Marker.vector_8]: 8,
+    [Marker.vector_9]: 9,
+    [Marker.vector_10]: 10,
+    [Marker.vector_11]: 11,
+    [Marker.vector_12]: 12,
+    [Marker.vector_13]: 13,
+    [Marker.vector_14]: 14,
+    [Marker.vector_15]: 15
 };
-type LongListLengths = {
-    [Marker.list_256]: 256,
-    [Marker.list_65536]: 65536,
-    [Marker.list_4G]: 4_294_967_296
+type LongVectorCapacity = {
+    [Marker.vector_255]: 255,
+    [Marker.vector_65535]: 65535,
+    [Marker.vector_4G]: 4_294_967_295
 };
-type ListLengths = SmallListLengths & LongListLengths;
-type SmallListSpec = {
-    [K in keyof SmallListLengths]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallListLengths[K]>];
-}[keyof SmallListLengths];
-type LongListSpec = {
-    [K in keyof LongListLengths]: [K, ...Array<PrimitiveMarkerSpecs>, LongListLengths[K]];
-}[keyof LongListLengths];
+// type VectorCapacity = SmallVectorCapacity & LongVectorCapacity;
+type SmallVectorSpec = {
+    [K in keyof SmallVectorCapacity]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallVectorCapacity[K]>];
+}[keyof SmallVectorCapacity];
+type LongVectorSpec = {
+    [K in keyof LongVectorCapacity]: [K, ...Array<PrimitiveMarkerSpecs>, LongVectorCapacity[K]];
+}[keyof LongVectorCapacity];
 
-type ListSpec =
-    | SmallListSpec
-    | LongListSpec;
+type VectorSpec =
+    | SmallVectorSpec
+    | LongVectorSpec;
 
 /// Dictionary
 type DictMarkers = Extract<
     Marker,
-    | IntRange<Marker.dict_256, Marker.dict_4G>
+    | IntRange<Marker.dict_255, Marker.dict_4G>
 >;
-type DictLengths = {
-    [Marker.dict_256]: 256,
-    [Marker.dict_65536]: 65536,
-    [Marker.dict_4G]: 4_294_967_296
+type DictCapacity = {
+    [Marker.dict_255]: 255,
+    [Marker.dict_65535]: 65535,
+    [Marker.dict_4G]: 4_294_967_295
 };
 
 type DictSpec = {
-    [K in keyof DictLengths]: [K, number,
+    [K in keyof DictCapacity]: [K, number,
         ...Flatten<
             [Marker.string, CharacterEncoding, PrimitiveMarkerSpecs]
         >
     ];
-}[keyof DictLengths];
+}[keyof DictCapacity];
 
 /// Map
 type MapMarkers = Extract<
     Marker,
-    | IntRange<Marker.map_256, Marker.map_4G>
+    | IntRange<Marker.map_255, Marker.map_4G>
 >;
-type MapLengths = {
-    [Marker.map_256]: 256,
-    [Marker.map_65536]: 65536,
-    [Marker.map_4G]: 4_294_967_296
+type MapCapacity = {
+    [Marker.map_255]: 255,
+    [Marker.map_65535]: 65535,
+    [Marker.map_4G]: 4_294_967_295
 };
 type MapSpec = {
-    [K in keyof MapLengths]: [K, number,
+    [K in keyof MapCapacity]: [K, number,
         ...Flatten<
             [PrimitiveMarkerSpecs, PrimitiveMarkerSpecs]
         >
     ];
-}[keyof MapLengths];
+}[keyof MapCapacity];
 
 /// Meta Data Types
 type MetaMarkers = Extract<
@@ -388,32 +388,25 @@ type MetaMarkers = Extract<
 >;
 
 /// String
-type UTFCharBytes<E extends CharacterEncoding> =
-    E extends CharacterEncoding.utf8
-    ? [Byte]
-    : [Byte, Byte];
-type UTFSpec<
-    E extends CharacterEncoding,
-    K extends keyof ListLengths
-> = K extends keyof SmallListLengths
-    ? Flatten<FixedLengthBuffer<UTFCharBytes<E>, ListLengths[K]>>
-    : Array<Byte>;
-type StringSpec = {
-    [K in keyof ListLengths]: {
-        [E in CharacterEncoding]: [
-            Marker.string,
-            E,
-            K,
-            ...UTFSpec<E, K>
-        ]
-    }[CharacterEncoding]
-}[keyof ListLengths];
-
-/// Vector
-type VectorSpec = [
-    Marker.vector,
-    ...ListSpec
-];
+// type UTFCharBytes<E extends CharacterEncoding> = E extends CharacterEncoding.utf8
+//     ? [Byte]
+//     : [Byte, Byte];
+// type UTFSpec<
+//     E extends CharacterEncoding,
+//     K extends keyof VectorCapacity
+// > = K extends keyof SmallVectorCapacity
+//     ? Flatten<FixedLengthBuffer<UTFCharBytes<E>, VectorCapacity[K]>>
+//     : Array<Byte>;
+// type StringSpec = {
+//     [K in keyof VectorCapacity]: {
+//         [E in CharacterEncoding]: [
+//             Marker.string,
+//             E,
+//             K,
+//             ...UTFSpec<E, K>
+//         ]
+//     }[CharacterEncoding]
+// }[keyof VectorCapacity];
 
 /// Optional
 type OptionalSpec = [
@@ -428,10 +421,10 @@ type EnumSpec = [
 ];
 
 /// Error
-type ErrorSpec = [
-    Marker.error,
-    ...StringSpec
-];
+// type ErrorSpec = [
+//     Marker.error,
+//     ...StringSpec
+// ];
 
 export type Markers =
     | NullMarker
@@ -440,8 +433,8 @@ export type Markers =
     | UnsignedIntMarkers
     | FloatMarkers
     | DecimalMarkers
-    | ArrayMarkers
-    | ListMarkers
+    | TupleMarkers
+    | VectorMarkers
     | DictMarkers
     | MapMarkers
     | MetaMarkers;
@@ -453,17 +446,16 @@ type PrimitiveMarkerSpecs =
     | UnsignedIntSpec
     | FloatSpec
     | DecimalSpec
-    | StringSpec
-    | EnumSpec
-    | ErrorSpec;
+    // | StringSpec
+    | EnumSpec;
+    // | ErrorSpec;
 
 type MarkerSpecs =
     | PrimitiveMarkerSpecs
-    | ArraySpec
-    | ListSpec
+    | TupleSpec
+    | VectorSpec
     | DictSpec
     | MapSpec
-    | VectorSpec
     | OptionalSpec;
 
 export type HBPFrame = Prepend<MarkerSpecs, typeof HBP_VERSION>;
