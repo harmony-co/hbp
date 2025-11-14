@@ -5,14 +5,14 @@
 
 Harmony Binary Protocol (HBP) is a general purpose serialization protocol inspired by the protocols like Bolt's PackStream and Redis's RESP3, that aims to provide a standardized type aware way to serialize and deserialize data.
 
-It consists of a set of basic types, composite types, and meta types that together allow you to represent data in the way you need.
+It consists of a set of primitive types, composite types, and meta types that together allow you to represent data in the way you need.
 
 # Table of Contents
 
 - [About](#about)
 - [Table of Contents](#table-of-contents)
 - [Representation](#representation)
-- [Basic Data Types](#basic-data-types)
+- [Primitive Data Types](#primitive-data-types)
   - [Null](#null)
   - [Bool](#bool)
   - [Numbers](#numbers)
@@ -39,9 +39,9 @@ Every serialized HBP value begins with the HBP version used to encode it followe
 
 ![representation image](representation.png)
 
-# Basic Data Types
+# Primitive Data Types
 
-Basic types (or primitives) are the fundamental blocks used to represent the encoded data.
+Primitive types (or primitives) are the fundamental blocks used to represent the encoded data.
 
 ## Null
 
@@ -127,27 +127,6 @@ Meta data types are special types that acts as metadata for other types and they
 
 HBP reserves all the `E0-FF` range for meta types.
 
-## String
-
-Marker: `E0`
-
-A String is a character encoded list of bytes.
-
-The string marker is always followed by a list marker with the type byte set to one of the following:
-
-| Byte | Encoding |
-| ---- | -------- |
-| `20` | UTF-8    |
-| `21` | UTF-16   |
-
-The sender ensures the encoding of the strings is valid therefor, validation on the client is unnecessary.
-
-## Vector
-
-Marker: `E3`
-
-The vector marker must **always** be followed by a list marker to indicate the size and type of the vector, the data should follow the same encoding as the indicated type.
-
 ## Optional
 
 Marker: `F0`
@@ -174,11 +153,11 @@ Serialized: 01 FF 6B 54 68 69 73 20 46 61 69 6C 65 64
 
 # Composite Data Types
 
-## Array
+## Tuple
 
-Small arrays:
+Small tuples:
 
-| Marker | Array size |
+| Marker | Tuple size |
 | :----: | :--------: |
 |  `70`  |     0      |
 |  `71`  |     1      |
@@ -197,7 +176,7 @@ Small arrays:
 |  `7E`  |     14     |
 |  `7F`  |     15     |
 
-Long arrays:
+Long tuples:
 
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
@@ -205,7 +184,7 @@ Long arrays:
 |  `DB`  |      2      |    65_535     |
 |  `DC`  |      4      | 4_294_967_295 |
 
-An array is a list of values, each one serializing their own type alongside like a basic hbp payload. If its a long array, the length will come **after** the value type.
+A tuple is a list of values, each one serializing their own type alongside like a basic hbp payload. If its a long array, the length will come **after** the value type.
 
 ```txt
 Original: [3, 6, 9]
@@ -214,30 +193,30 @@ Serialized: 01 73 10 03 10 06 10 09
 ```
 
 
-## List
+## Vector
 
-Small lists:
+Small vectors:
 
-| Marker | List Size |
-| :----: | :-------: |
-|  `80`  |     0     |
-|  `81`  |     1     |
-|  `82`  |     2     |
-|  `83`  |     3     |
-|  `84`  |     4     |
-|  `85`  |     5     |
-|  `86`  |     6     |
-|  `87`  |     7     |
-|  `88`  |     8     |
-|  `89`  |     9     |
-|  `8A`  |    10     |
-|  `8B`  |    11     |
-|  `8C`  |    12     |
-|  `8D`  |    13     |
-|  `8E`  |    14     |
-|  `8F`  |    15     |
+| Marker | Vector Size |
+| :----: | :---------: |
+|  `80`  |      0      |
+|  `81`  |      1      |
+|  `82`  |      2      |
+|  `83`  |      3      |
+|  `84`  |      4      |
+|  `85`  |      5      |
+|  `86`  |      6      |
+|  `87`  |      7      |
+|  `88`  |      8      |
+|  `89`  |      9      |
+|  `8A`  |     10      |
+|  `8B`  |     11      |
+|  `8C`  |     12      |
+|  `8D`  |     13      |
+|  `8E`  |     14      |
+|  `8F`  |     15      |
 
-Long lists:
+Long vectors:
 
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
@@ -245,12 +224,12 @@ Long lists:
 |  `DE`  |      2      |    65_535     |
 |  `DF`  |      4      | 4_294_967_295 |
 
-A list as the name indicates is a list of values where all the values have the same type which has to be indicated right after the list marker. If its a long list, the length will come **after** the value type.
+A vector is a known-type list of items. The vector marker is followed by [primitive data type](#primitive-data-types) and all elements will follow the encoding of that type.
 
 ```txt
-Original: List([3, 6, 9])
+Original: Vector(u8, [3, 6, 9])
 
-Serialized: 01 83 10 03 06 09
+Serialized: 01 83 20 03 06 09
 ```
 
 ## Dictionary
@@ -286,24 +265,22 @@ A map is just like a dictionary but instead, the keys can be of any type.
 
 | Marker  |                   Name                   |                Type                |
 | :-----: | :--------------------------------------: | :--------------------------------: |
-|  `00`   |             [`null`](#null)              |   [Primitive](#basic-data-types)   |
-|  `01`   |             [`false`](#bool)             |   [Primitive](#basic-data-types)   |
-|  `02`   |             [`true`](#bool)              |   [Primitive](#basic-data-types)   |
-| `10-16` |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
-|  `1F`   |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
-| `20-26` | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
-|  `2F`   | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
-| `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
-| `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
-|  `3F`   |          [`bfloat16`](#floats)           |   [Primitive](#basic-data-types)   |
-| `70-7F` |            [`array`](#array)             | [Composite](#composite-data-types) |
-| `80-8F` |             [`list`](#list)              | [Composite](#composite-data-types) |
+|  `00`   |             [`null`](#null)              | [Primitive](#primitive-data-types) |
+|  `01`   |             [`false`](#bool)             | [Primitive](#primitive-data-types) |
+|  `02`   |             [`true`](#bool)              | [Primitive](#primitive-data-types) |
+| `10-16` |   [`signed integer`](#signed-integers)   | [Primitive](#primitive-data-types) |
+|  `1F`   |   [`signed integer`](#signed-integers)   | [Primitive](#primitive-data-types) |
+| `20-26` | [`unsigned integer`](#unsigned-integers) | [Primitive](#primitive-data-types) |
+|  `2F`   | [`unsigned integer`](#unsigned-integers) | [Primitive](#primitive-data-types) |
+| `30-37` |            [`float`](#floats)            | [Primitive](#primitive-data-types) |
+| `3A-3C` |           [`decimal`](#floats)           | [Primitive](#primitive-data-types) |
+|  `3F`   |          [`bfloat16`](#floats)           | [Primitive](#primitive-data-types) |
+| `70-7F` |            [`tuple`](#tuple)             | [Composite](#composite-data-types) |
+| `80-8F` |           [`vector`](#vector)            | [Composite](#composite-data-types) |
 | `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
 | `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
-| `DA-DC` |            [`array`](#array)             | [Composite](#composite-data-types) |
-| `DD-DF` |             [`list`](#list)              | [Composite](#composite-data-types) |
-|  `E0`   |           [`string`](#string)            |      [Meta](#meta-data-types)      |
-|  `E3`   |           [`vector`](#vector)            |      [Meta](#meta-data-types)      |
+| `DA-DC` |            [`tuple`](#tuple)             | [Composite](#composite-data-types) |
+| `DD-DF` |           [`vector`](#vector)            | [Composite](#composite-data-types) |
 |  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
 |  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
 |  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
