@@ -6,6 +6,8 @@ const assert = std.debug.assert;
 pub const ParseOptions = struct {
     /// Allow parsing `i8` as `u8` and vice-versa
     ignore_integer_signedness: bool = false,
+    /// Use `std.enums.fromInt` instead of attempting to cast
+    safe_enum_parsing: bool = false,
     float_behavior: enum(u1) {
         widen,
         preserve,
@@ -91,7 +93,11 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
             const token = try scanner.next();
             if (token != .int) return error.UnexpectedToken;
 
-            return @enumFromInt(sliceToInt(enumInfo.tag_type, token.int.view));
+            if (comptime options.safe_enum_parsing) {
+                return std.enums.fromInt(T, sliceToInt(enumInfo.tag_type, token.int.view)) orelse error.InvalidEnumTag;
+            } else {
+                return @enumFromInt(sliceToInt(enumInfo.tag_type, token.int.view));
+            }
         },
         .@"struct" => |structInfo| {
             if (structInfo.is_tuple) {
