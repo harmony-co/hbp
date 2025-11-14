@@ -211,6 +211,7 @@ pub fn next(self: *Scanner) !Token {
                     self.state = .marker;
                     return .optional;
                 },
+                // NOTE: Maybe it could be worth to allow enums to omit the type marker for `u8` enums
                 .@"enum" => {
                     self.cursor += 1;
                     if (self.input[self.cursor] == @intFromEnum(MarkerType.arbitrary_unsigned_int)) {
@@ -257,7 +258,7 @@ pub fn next(self: *Scanner) !Token {
             };
         },
         .post_value => {
-            if (try self.checkEnd()) return .eos;
+            if (self.checkEnd()) return .eos;
             // NOTE: If no changes are necessary here after all types have been implemented
             // remove this and add a simple check to the beginning of `marker` instead.
             self.state = .marker;
@@ -274,13 +275,8 @@ fn calculateIntegerByteLength(marker: u8) !usize {
     };
 }
 
-fn checkEnd(self: *Scanner) !bool {
+fn checkEnd(self: *Scanner) bool {
     return self.cursor >= self.input.len;
-    // if (self.cursor >= self.input.len) {
-    //     if (self.stack.bit_len == 0) return true;
-    //     return error.BufferUnderrun;
-    // }
-    // return false;
 }
 
 fn parseTupleState(self: *Scanner, byte_length: u32) Token {
@@ -363,8 +359,8 @@ pub const MarkerType = enum(u8) {
     arbitrary_dict_1 = 0xD0,
     arbitrary_dict_2 = 0xD1,
     arbitrary_dict_4 = 0xD2,
-    optional = 0xF0,
-    @"enum" = 0xF1,
+    optional = 0xE0,
+    @"enum" = 0xE1,
     @"error" = 0xFF,
 };
 

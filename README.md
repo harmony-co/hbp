@@ -129,13 +129,13 @@ HBP reserves all the `E0-FF` range for meta types.
 
 ## Optional
 
-Marker: `F0`
+Marker: `E0`
 
 This marker is used as an indicator that the following marker can either be [`null`](#null) or another type.
 
 ## Enum
 
-Marker: `F1`
+Marker: `E1`
 
 The enum marker must **always** be followed by an integer marker to indicate the maximum size of the enum, the data should follow the same encoding as the indicated type.
 
@@ -281,6 +281,6 @@ A map is just like a dictionary but instead, the keys can be of any type.
 | `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
 | `DA-DC` |            [`tuple`](#tuple)             | [Composite](#composite-data-types) |
 | `DD-DF` |           [`vector`](#vector)            | [Composite](#composite-data-types) |
-|  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
-|  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
+|  `E0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
+|  `E1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
 |  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
