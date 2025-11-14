@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Scanner = @This();
 
-state: State = .version,
+state: State = .identifier,
 value_start: usize = undefined,
 input: []const u8 = undefined,
 cursor: usize = 0,
@@ -83,10 +83,10 @@ pub fn peekNextTokenType(self: *Scanner) !TokenType {
 
 pub fn next(self: *Scanner) !Token {
     state: switch (self.state) {
-        .version => {
+        .identifier => {
             self.cursor += 1;
             self.state = .marker;
-            return .{ .version = self.input[0] };
+            return .{ .identifier = self.input[0] };
         },
         .marker => {
             const m = std.enums.fromInt(MarkerType, self.input[self.cursor]) orelse return error.UnknownMarker;
@@ -365,7 +365,7 @@ pub const MarkerType = enum(u8) {
 };
 
 pub const State = enum {
-    version,
+    identifier,
     marker,
     post_value,
     int,
@@ -375,7 +375,7 @@ pub const State = enum {
 };
 
 pub const TokenType = enum {
-    version,
+    identifier,
     null,
     false,
     true,
@@ -388,7 +388,7 @@ pub const TokenType = enum {
 };
 
 pub const Token = union(TokenType) {
-    version: u8,
+    identifier: u8,
     null,
     false,
     true,

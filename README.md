@@ -12,6 +12,7 @@ It consists of a set of primitive types, composite types, and meta types that to
 - [About](#about)
 - [Table of Contents](#table-of-contents)
 - [Representation](#representation)
+- [Identifier](#identifier)
 - [Primitive Data Types](#primitive-data-types)
   - [Null](#null)
   - [Bool](#bool)
@@ -21,14 +22,12 @@ It consists of a set of primitive types, composite types, and meta types that to
     - [Floats](#floats)
     - [Decimals](#decimals)
 - [Meta Data Types](#meta-data-types)
-  - [String](#string)
-  - [Vector](#vector)
   - [Optional](#optional)
   - [Enum](#enum)
   - [Error](#error)
 - [Composite Data Types](#composite-data-types)
-  - [Array](#array)
-  - [List](#list)
+  - [Tuple](#tuple)
+  - [Vector](#vector)
   - [Dictionary](#dictionary)
   - [Map](#map)
 - [Cheat Sheet](#cheat-sheet)
@@ -38,6 +37,14 @@ It consists of a set of primitive types, composite types, and meta types that to
 Every serialized HBP value begins with the HBP version used to encode it followed by a marker that represents the type of the data.
 
 ![representation image](representation.png)
+
+# Identifier
+
+The HBP identifier is the byte at the beginning of every payload that tells you the version of the protocol and allows developers to pass custom flags.
+
+The identifier is a single byte subdivided into 2 parts of 4 bits.
+The first 4 bits are reserved for the protocol version, parsers use this information to adapt to version-specific changes.
+The last 4 bits are used for user defined flags, spec compliant parsers will not validate or make use of this bits for anything, they are given to the user as-is.
 
 # Primitive Data Types
 
