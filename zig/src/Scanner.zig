@@ -18,6 +18,69 @@ pub fn deinit(self: *Scanner) void {
     self.* = undefined;
 }
 
+pub fn peekNextTokenType(self: *Scanner) !TokenType {
+    switch (self.state) {
+        .marker => {
+            const m = std.enums.fromInt(MarkerType, self.input[self.cursor]) orelse return error.UnknownMarker;
+            return switch (m) {
+                .null => .null,
+                .false => .false,
+                .true => .true,
+                .signed_int_8,
+                .signed_int_16,
+                .signed_int_32,
+                .signed_int64,
+                .signed_int_128,
+                .signed_int_256,
+                .signed_int_512,
+                .arbitrary_signed_int,
+                .unsigned_int_8,
+                .unsigned_int_16,
+                .unsigned_int_32,
+                .unsigned_int64,
+                .unsigned_int_128,
+                .unsigned_int_256,
+                .unsigned_int_512,
+                .arbitrary_unsigned_int,
+                => .int,
+                .half_float,
+                // .minifloat,
+                .single_float,
+                // .extended_float_40,
+                .double_float,
+                .extended_float_80,
+                .quadruple_float,
+                // .octuple_float,
+                // .brain_float,
+                => .float,
+                .empty_tuple,
+                .tuple_1,
+                .tuple_2,
+                .tuple_3,
+                .tuple_4,
+                .tuple_5,
+                .tuple_6,
+                .tuple_7,
+                .tuple_8,
+                .tuple_9,
+                .tuple_10,
+                .tuple_11,
+                .tuple_12,
+                .tuple_13,
+                .tuple_14,
+                .tuple_15,
+                .arbitrary_tuple_1,
+                .arbitrary_tuple_2,
+                .arbitrary_tuple_4,
+                => .tuple,
+                .optional => .optional,
+                else => error.NotImplemented,
+            };
+        },
+        else => return error.UnsupportedLookup,
+    }
+}
+
 pub fn next(self: *Scanner) !Token {
     state: switch (self.state) {
         .version => {
@@ -142,6 +205,11 @@ pub fn next(self: *Scanner) !Token {
                     const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
                     self.cursor += 4;
                     return self.parseTupleState(byte_length);
+                },
+                .optional => {
+                    self.cursor += 1;
+                    self.state = .marker;
+                    return .optional;
                 },
 
                 else => return error.NotImplemented,
@@ -300,7 +368,19 @@ pub const State = enum {
     arbitrary_uint,
 };
 
-pub const Token = union(enum) {
+pub const TokenType = enum {
+    version,
+    null,
+    false,
+    true,
+    int,
+    float,
+    tuple,
+    optional,
+    eos,
+};
+
+pub const Token = union(TokenType) {
     version: u8,
     null,
     false,
@@ -314,7 +394,7 @@ pub const Token = union(enum) {
         view: []const u8,
     },
     tuple: u32,
-
+    optional,
     eos,
 };
 

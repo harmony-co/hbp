@@ -10,6 +10,11 @@ pub const ParseOptions = struct {
         widen,
         preserve,
     } = .preserve,
+    /// Wether to try parsing types that do not start with `0xF0` (optional marker)
+    non_typed_optionals: enum(u1) {
+        @"error",
+        allow,
+    } = .@"error",
 };
 
 pub fn parseFromSlice(comptime T: type, slice: []const u8, comptime options: ParseOptions) !T {
@@ -28,6 +33,12 @@ pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, comptime option
 
 pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
     switch (@typeInfo(T)) {
+        .null => {
+            return switch (try scanner.next()) {
+                .null => null,
+                else => error.UnexpectedToken,
+            };
+        },
         .bool => {
             return switch (try scanner.next()) {
                 .false => false,
@@ -60,6 +71,20 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
                 128 => std.mem.bytesToValue(f128, token.float.view),
                 else => unreachable,
             });
+        },
+        .optional => |optional| {
+            switch (try scanner.peekNextTokenType()) {
+                .optional => {
+                    _ = try scanner.next();
+                    if (try scanner.peekNextTokenType() == .null) {
+                        _ = try scanner.next();
+                        return null;
+                    }
+
+                    return try innerParse(optional.child, scanner, options);
+                },
+                else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, options) else error.UnexpectedToken,
+            }
         },
         .@"struct" => |structInfo| {
             if (structInfo.is_tuple) {

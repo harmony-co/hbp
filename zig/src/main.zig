@@ -69,18 +69,34 @@ pub fn main() !void {
     }
 
     std.debug.print("-------------------------------------------------\n", .{});
-    const in = &.{ 0x01, 0x72, 0x20, 0xFF, 0x21, 0x00, 0x13 };
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(struct { u8, u16 }, in, .{ .float_behavior = .widen })});
+    const in1 = &.{ 0x01, 0x72, 0x20, 0xFF, 0x21, 0x00, 0x13 };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in1)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(struct { u8, u16 }, in1, .{})});
     buf = undefined;
 
-    // var s: Scanner = .init(allocator, &serialized);
-    // while (true) {
-    //     const token = try s.next();
-    //     if (token == .eos) break;
+    std.debug.print("-------------------------------------------------\n", .{});
+    const in2 = &.{ 0x01, 0xF0, 0x20, 0xFA };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in2)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in2, .{})});
+    buf = undefined;
 
-    //     std.debug.print("Scanner: {any}\n", .{token});
-    // }
+    std.debug.print("-------------------------------------------------\n", .{});
+    const in3 = &.{ 0x01, 0xF0, 0x00 };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in3)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in3, .{})});
+    buf = undefined;
+
+    std.debug.print("-------------------------------------------------\n", .{});
+    const in4 = &.{ 0x01, 0x20, 0xFA };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in4)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in4, .{})});
+    buf = undefined;
+
+    std.debug.print("-------------------------------------------------\n", .{});
+    const in5 = &.{ 0x01, 0x20, 0xFA };
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in5)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in5, .{ .non_typed_optionals = .allow })});
+    buf = undefined;
 }
 
 fn readableOutput(buffer: []u8, input: []const u8) []const u8 {
