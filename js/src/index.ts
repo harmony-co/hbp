@@ -59,6 +59,25 @@ export const enum Marker {
     /** @see [IEEE 754 Decimal128](https://en.wikipedia.org/wiki/Decimal128_floating-point_format) */
     decimal_128,
 
+    /// String
+    /** Empty string */
+    string_utf8_0 = 0x60,
+    string_utf8_1,
+    string_utf8_2,
+    string_utf8_3,
+    string_utf8_4,
+    string_utf8_5,
+    string_utf8_6,
+    string_utf8_7,
+    string_utf8_8,
+    string_utf8_9,
+    string_utf8_10,
+    string_utf8_11,
+    string_utf8_12,
+    string_utf8_13,
+    string_utf8_14,
+    string_utf8_15,
+
     /// Tuple
     /** Empty tuple */
     tuple_0 = 0x70,
@@ -77,10 +96,6 @@ export const enum Marker {
     tuple_13,
     tuple_14,
     tuple_15,
-    tuple_255 = 0xDA,
-    tuple_65535,
-    /** 4,294,967,295 Tuple elements */
-    tuple_4G,
 
     /// Vector
     /** Empty vector */
@@ -100,10 +115,15 @@ export const enum Marker {
     vector_13,
     vector_14,
     vector_15,
-    vector_255 = 0xDD,
-    vector_65535,
-    /** 4,294,967,295 Vector elements */
-    vector_4G,
+
+    /// Long String
+    string_utf8_255 = 0xC0,
+    string_utf8_65535,
+    /** 4,294,967,295 characters */
+    string_utf8_4G,
+
+    /// Arbitrarily Encoded String
+    string_arbitrary,
 
     /// Dictionary
     dict_255 = 0xD0,
@@ -117,6 +137,18 @@ export const enum Marker {
     /** 4,294,967,295 Map elements */
     map_4G,
 
+    /// Long Tuple
+    tuple_255 = 0xDA,
+    tuple_65535,
+    /** 4,294,967,295 Tuple elements */
+    tuple_4G,
+
+    /// Long Vector
+    vector_255 = 0xDD,
+    vector_65535,
+    /** 4,294,967,295 Vector elements */
+    vector_4G,
+
     /// Meta Data Types
     optional = 0xE0,
     enum = 0xE1,
@@ -127,7 +159,6 @@ export const enum Marker {
 
 export const enum CharacterEncoding {
     /* eslint-disable @typescript-eslint/naming-convention */
-    utf8 = 0x20,
     utf16
     /* eslint-enable @typescript-eslint/naming-convention */
 }
@@ -383,44 +414,49 @@ type MapSpec = {
 }[keyof MapExtraBytes];
 
 /// String
-type UTF8StringCapacity = {
-    [0x60]: 1,
-    [0x61]: 2,
-    [0x62]: 3,
-    [0x63]: 4,
-    [0x64]: 5,
-    [0x65]: 6,
-    [0x66]: 7,
-    [0x67]: 8
+export type UTF8StringMarker = Extract<
+    Marker,
+    | IntRange<Marker.string_utf8_0, Marker.string_utf8_15>
+    | IntRange<Marker.string_utf8_255, Marker.string_utf8_4G>
+>;
+type SmallUTF8StringCapacity = {
+    [Marker.string_utf8_0]: 0,
+    [Marker.string_utf8_1]: 1,
+    [Marker.string_utf8_2]: 2,
+    [Marker.string_utf8_3]: 3,
+    [Marker.string_utf8_4]: 4,
+    [Marker.string_utf8_5]: 5,
+    [Marker.string_utf8_6]: 6,
+    [Marker.string_utf8_7]: 7,
+    [Marker.string_utf8_8]: 8,
+    [Marker.string_utf8_9]: 9,
+    [Marker.string_utf8_10]: 10,
+    [Marker.string_utf8_11]: 11,
+    [Marker.string_utf8_12]: 12,
+    [Marker.string_utf8_13]: 13,
+    [Marker.string_utf8_14]: 14,
+    [Marker.string_utf8_15]: 15
 };
-type UTF8StringSpec = {
-    [K in keyof UTF8StringCapacity]: [K, ...FixedLengthBuffer<Byte, UTF8StringCapacity[K]>, ...Array<Byte>]
-}[keyof UTF8StringCapacity];
-type ArbitraryStringSpec = [0x6F, CharacterEncoding, Byte, Byte, ...Array<Byte>];
+type LongUTF8StringExtraBytes = {
+    [Marker.string_utf8_255]: 1,
+    [Marker.string_utf8_65535]: 2,
+    [Marker.string_utf8_4G]: 4
+};
+type SmallUTF8StringSpec = {
+    [K in keyof SmallUTF8StringCapacity]: [K, ...FixedLengthBuffer<Byte, SmallUTF8StringCapacity[K]>]
+}[keyof SmallUTF8StringCapacity];
+type LongUTF8StringSpec = {
+    [K in keyof LongUTF8StringExtraBytes]: [K, ...FixedLengthBuffer<Byte, LongUTF8StringExtraBytes[K]>, ...Array<Byte>]
+}[keyof LongUTF8StringExtraBytes];
+type ArbitraryStringSpec = [Marker.string_arbitrary, CharacterEncoding, Byte, Byte, ...Array<Byte>];
+
+type UTF8StringSpec =
+    | SmallUTF8StringSpec
+    | LongUTF8StringSpec;
 
 type StringSpec =
     | UTF8StringSpec
     | ArbitraryStringSpec;
-
-// type UTFCharBytes<E extends CharacterEncoding> = E extends CharacterEncoding.utf8
-//     ? [Byte]
-//     : [Byte, Byte];
-// type UTFSpec<
-//     E extends CharacterEncoding,
-//     K extends keyof VectorCapacity
-// > = K extends keyof SmallVectorCapacity
-//     ? Flatten<FixedLengthBuffer<UTFCharBytes<E>, VectorCapacity[K]>>
-//     : Array<Byte>;
-// type StringSpec = {
-//     [K in keyof VectorCapacity]: {
-//         [E in CharacterEncoding]: [
-//             Marker.string,
-//             E,
-//             K,
-//             ...UTFSpec<E, K>
-//         ]
-//     }[CharacterEncoding]
-// }[keyof VectorCapacity];
 
 /// Meta Data Types
 export type MetaMarker = Extract<
