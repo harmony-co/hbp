@@ -180,7 +180,6 @@ type BuildTuple<T, L extends number, Acc extends ReadonlyArray<T> = []> =
 type FixedLengthBuffer<T, L extends number> =
     number extends L ? Array<T> : BuildTuple<T, L>;
 
-type Prepend<T, U> = T extends Array<unknown> ? [U, ...T] : never;
 type Tail<M extends number, T extends Array<unknown>> = T extends [M, ...infer R] ? R : never;
 
 /** @see https://stackoverflow.com/a/59833759/28282697 */
@@ -467,22 +466,22 @@ export type MetaMarker = Extract<
 >;
 
 /// Optional
-type OptionalSpec = Prepend<
-    PrimitiveMarkerSpecs,
-    Marker.optional
->;
+type OptionalSpec = [
+    Marker.optional,
+    ...PrimitiveMarkerSpecs
+];
 
 /// Enum
-type EnumSpec = Prepend<
-    UnsignedIntFixedSpecs,
-    Marker.enum
->;
+type EnumSpec = [
+    Marker.enum,
+    ...UnsignedIntFixedSpecs
+];
 
 /// Error
-type ErrorSpec = Prepend<
-    UTF8StringSpec,
-    Marker.error
->;
+type ErrorSpec = [
+    Marker.error,
+    ...UTF8StringSpec
+];
 
 export type PrimitiveMarker =
     | NullMarker
