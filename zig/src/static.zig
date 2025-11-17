@@ -27,7 +27,7 @@ pub fn parseFromSlice(comptime T: type, slice: []const u8, comptime options: Par
 }
 
 pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
-    assert(try scanner.next() == .version);
+    assert(try scanner.next() == .identifier);
     const value = try innerParse(T, scanner, options);
     assert(try scanner.next() == .eos);
     return value;

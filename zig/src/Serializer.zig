@@ -1,6 +1,5 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const HBP_VERSION = @import("config").HBP_VERSION;
 
 const ByteAlignedInt = std.math.ByteAlignedInt;
 
@@ -11,6 +10,8 @@ const eql = std.mem.eql;
 const native_endian = builtin.cpu.arch.endian();
 
 const Serializer = @This();
+
+const HBP_VERSION = 1;
 
 fn calculateMarker(comptime T: type) []const u8 {
     comptime {

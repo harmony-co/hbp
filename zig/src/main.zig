@@ -75,13 +75,13 @@ pub fn main() !void {
     buf = undefined;
 
     std.debug.print("-------------------------------------------------\n", .{});
-    const in2 = &.{ 0x01, 0xF0, 0x20, 0xFA };
+    const in2 = &.{ 0x01, 0xE0, 0x20, 0xFA };
     std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in2)});
     std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in2, .{})});
     buf = undefined;
 
     std.debug.print("-------------------------------------------------\n", .{});
-    const in3 = &.{ 0x01, 0xF0, 0x00 };
+    const in3 = &.{ 0x01, 0xE0, 0x00 };
     std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in3)});
     std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in3, .{})});
     buf = undefined;
@@ -99,7 +99,7 @@ pub fn main() !void {
     buf = undefined;
 
     std.debug.print("-------------------------------------------------\n", .{});
-    const in6 = &.{ 0x01, 0xF1, 0x20, 0x00 };
+    const in6 = &.{ 0x01, 0xE1, 0x20, 0x00 };
     std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in6)});
     std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(enum { TEST }, in6, .{})});
     buf = undefined;
