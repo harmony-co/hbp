@@ -10,7 +10,7 @@ test "null" {
     var scanner: Scanner = .init(&.{ 0x01, 0x00 });
     defer scanner.deinit();
 
-    try expectNext(&scanner, .{ .version = 1 });
+    try expectNext(&scanner, .{ .identifier = 1 });
     try expectNext(&scanner, .null);
     try expectNext(&scanner, .eos);
 }
@@ -18,7 +18,7 @@ test "null" {
 test "bool" {
     var scanner: Scanner = .init(&.{ 0x01, 0x01 });
 
-    try expectNext(&scanner, .{ .version = 1 });
+    try expectNext(&scanner, .{ .identifier = 1 });
     try expectNext(&scanner, .false);
     try expectNext(&scanner, .eos);
 
@@ -26,7 +26,7 @@ test "bool" {
     scanner = .init(&.{ 0x01, 0x02 });
     defer scanner.deinit();
 
-    try expectNext(&scanner, .{ .version = 1 });
+    try expectNext(&scanner, .{ .identifier = 1 });
     try expectNext(&scanner, .true);
     try expectNext(&scanner, .eos);
 }
@@ -71,7 +71,7 @@ test "int" {
         defer scanner.deinit();
 
         const out = test_output[i];
-        try expectNext(&scanner, .{ .version = 1 });
+        try expectNext(&scanner, .{ .identifier = 1 });
         try expectNext(&scanner, out);
         try expectNext(&scanner, .eos);
     }
@@ -88,7 +88,7 @@ fn expectNext(scanner: *Scanner, expected_token: Scanner.Token) !void {
         .float => |expected_value| {
             try expect(eql(u8, expected_value.view, token.int.view));
         },
-        .version,
+        .identifier,
         .null,
         .false,
         .true,
