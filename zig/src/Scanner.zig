@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Scanner = @This();
+pub const Scanner = @This();
 
 state: State = .identifier,
 value_start: usize = undefined,
