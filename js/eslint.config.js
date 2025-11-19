@@ -3,7 +3,9 @@ import tsEslint from "typescript-eslint";
 import stylistic from "@stylistic/eslint-plugin";
 import jsdoc from "eslint-plugin-jsdoc";
 
-export default tsEslint.config({
+import { defineConfig } from "eslint/config";
+
+export default defineConfig({
     ignores: [
         "**/*.js",
         "**/*.d.ts",
@@ -22,7 +24,6 @@ export default tsEslint.config({
         parser: tsEslint.parser,
         ecmaVersion: "latest",
         parserOptions: {
-            tsconfigRootDir: ".",
             projectService: true
         }
     },
