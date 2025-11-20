@@ -177,7 +177,7 @@ type BuildTuple<T, L extends number, Acc extends ReadonlyArray<T> = []> =
 type FixedLengthBuffer<T, L extends number> =
     number extends L ? Array<T> : BuildTuple<T, L>;
 
-type Tail<M extends number, T extends Array<unknown>> = T extends [M, ...infer R] ? R : never;
+export type Tail<M extends number, T extends Array<unknown>> = T extends [M, ...infer R] ? R : never;
 
 /** @see https://stackoverflow.com/a/59833759/28282697 */
 type Flatten<
