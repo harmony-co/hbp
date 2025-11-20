@@ -1,436 +1,736 @@
+import type { BooleanMarker, DecimalMarker, DictMarker, FloatMarker, HBPFrame, MapMarker, NullMarker, Tail, TupleMarker, UTF8StringMarker, VectorMarker, PrimitiveMarker } from "./Specification.js";
 import { HBPVersion, Marker } from "./Specification.js";
 
-class BufferWriter {
-    private buffer: Uint8Array;
-    private offset: number;
-    private view: DataView;
+type BufferWriterState = {
+    buffer: Uint8Array,
+    offset: number,
+    view: DataView
+};
 
-    public constructor(initialSize: number = 1024) {
-        this.buffer = new Uint8Array(initialSize);
-        this.view = new DataView(this.buffer.buffer);
-        this.offset = 0;
-    }
+export type HBPMapKey = MarkerToType<PrimitiveMarker>;
 
-    public ensureCapacity(needed: number): void {
-        if (this.offset + needed > this.buffer.length) {
-            const newSize = Math.max(this.buffer.length * 2, this.offset + needed);
-            const newBuffer = new Uint8Array(newSize);
-            newBuffer.set(this.buffer);
-            this.buffer = newBuffer;
-            this.view = new DataView(this.buffer.buffer);
-        }
-    }
+export type HBPValue =
+    | null
+    | undefined
+    | boolean
+    | number
+    | bigint
+    | string
+    | Array<HBPValue>
+    | Int8Array
+    | Uint8Array
+    | Int16Array
+    | Uint16Array
+    | Int32Array
+    | Uint32Array
+    | Float32Array
+    | Float64Array
+    | Map<HBPMapKey, HBPValue>
+    | { [key: string]: HBPValue }
+    | Error;
 
-    public writeUint8(value: number): void {
-        this.ensureCapacity(1);
-        this.view.setUint8(this.offset, value);
-        this.offset += 1;
-    }
+/* eslint-disable @stylistic/indent */
+export type MarkerToType<M extends Marker> =
+    M extends NullMarker ? null :
+    M extends Marker.false ? false :
+    M extends Marker.true ? true :
+    M extends
+        | Marker.signed_int_8
+        | Marker.signed_int_16
+        | Marker.signed_int_32 ? number :
+    M extends
+        | Marker.signed_int_64
+        | Marker.signed_int_128
+        | Marker.signed_int_256
+        | Marker.signed_int_512
+        | Marker.signed_int_arbitrary ? bigint :
+    M extends
+        | Marker.unsigned_int_8
+        | Marker.unsigned_int_16
+        | Marker.unsigned_int_32 ? number :
+    M extends
+        | Marker.unsigned_int_64
+        | Marker.unsigned_int_128
+        | Marker.unsigned_int_256
+        | Marker.unsigned_int_512
+        | Marker.unsigned_int_arbitrary ? bigint :
+    M extends FloatMarker ? number :
+    M extends DecimalMarker ? number :
+    M extends
+        | UTF8StringMarker
+        | Marker.string_arbitrary ? string :
+    M extends TupleMarker ? Array<HBPValue> :
+    M extends VectorMarker ?
+        | Int8Array
+        | Uint8Array
+        | Int16Array
+        | Uint16Array
+        | Int32Array
+        | Uint32Array
+        | Float32Array
+        | Float64Array :
+    M extends DictMarker ? Record<string, HBPValue> :
+    M extends MapMarker ? Map<HBPMapKey, HBPValue> :
+    M extends Marker.error ? Error :
+    M extends Marker.optional ? HBPValue :
+    M extends Marker.enum ? number | bigint :
+    never;
+/* eslint-enable @stylistic/indent */
 
-    public writeInt8(value: number): void {
-        this.ensureCapacity(1);
-        this.view.setInt8(this.offset, value);
-        this.offset += 1;
-    }
+/* eslint-disable @stylistic/indent */
+export type InferHBPType<T> =
+    T extends null ? NullMarker :
+    T extends false ? Marker.false :
+    T extends true ? Marker.true :
+    T extends boolean ? BooleanMarker :
+    T extends number ?
+        | FloatMarker
+        | Marker.signed_int_8
+        | Marker.signed_int_16
+        | Marker.signed_int_32 :
+    T extends bigint ?
+        | Marker.signed_int_64
+        | Marker.signed_int_128
+        | Marker.unsigned_int_64
+        | Marker.unsigned_int_128
+        | Marker.signed_int_arbitrary
+        | Marker.unsigned_int_arbitrary :
+    T extends string ?
+        | UTF8StringMarker
+        | Marker.string_arbitrary :
+    T extends Array<any> ? TupleMarker :
+    T extends
+        | Int8Array
+        | Uint8Array
+        | Int16Array
+        | Uint16Array
+        | Int32Array
+        | Uint32Array
+        | Float32Array
+        | Float64Array ? VectorMarker :
+    T extends Map<any, any> ? MapMarker :
+    T extends Error ? Marker.error :
+    T extends object ? DictMarker :
+    never;
+/* eslint-enable @stylistic/indent */
 
-    public writeUint16(value: number): void {
-        this.ensureCapacity(2);
-        this.view.setUint16(this.offset, value, false);
-        this.offset += 2;
-    }
+function createBufferWriter(initialSize: number = 1024): BufferWriterState {
+    const buffer = new Uint8Array(initialSize);
+    return {
+        buffer,
+        offset: 0,
+        view: new DataView(buffer.buffer)
+    };
+}
 
-    public writeInt16(value: number): void {
-        this.ensureCapacity(2);
-        this.view.setInt16(this.offset, value, false);
-        this.offset += 2;
-    }
-
-    public writeUint32(value: number): void {
-        this.ensureCapacity(4);
-        this.view.setUint32(this.offset, value, false);
-        this.offset += 4;
-    }
-
-    public writeInt32(value: number): void {
-        this.ensureCapacity(4);
-        this.view.setInt32(this.offset, value, false);
-        this.offset += 4;
-    }
-
-    public writeBigInt64(value: bigint): void {
-        this.ensureCapacity(8);
-        this.view.setBigInt64(this.offset, value, false);
-        this.offset += 8;
-    }
-
-    public writeBigUint64(value: bigint): void {
-        this.ensureCapacity(8);
-        this.view.setBigUint64(this.offset, value, false);
-        this.offset += 8;
-    }
-
-    public writeBigIntBytes(value: bigint, byteLength: number): void {
-        this.ensureCapacity(byteLength);
-        let tempVal = value;
-        // Write in Big Endian order: MSB at lowest offset
-        // We iterate from end of buffer backwards for simple extraction
-        for (let i = byteLength - 1; i >= 0; i--) {
-            const byte = Number(tempVal & 0xFFn);
-            this.view.setUint8(this.offset + i, byte);
-            tempVal >>= 8n;
-        }
-        this.offset += byteLength;
-    }
-
-    public writeFloat32(value: number): void {
-        this.ensureCapacity(4);
-        this.view.setFloat32(this.offset, value, false);
-        this.offset += 4;
-    }
-
-    public writeFloat64(value: number): void {
-        this.ensureCapacity(8);
-        this.view.setFloat64(this.offset, value, false);
-        this.offset += 8;
-    }
-
-    public writeBuffer(buf: Uint8Array): void {
-        this.ensureCapacity(buf.length);
-        this.buffer.set(buf, this.offset);
-        this.offset += buf.length;
-    }
-
-    public getResult(): Uint8Array {
-        return this.buffer.slice(0, this.offset);
+function ensureCapacity(state: BufferWriterState, needed: number): void {
+    if (state.offset + needed > state.buffer.length) {
+        const newSize = Math.max(state.buffer.length * 2, state.offset + needed);
+        const newBuffer = new Uint8Array(newSize);
+        newBuffer.set(state.buffer);
+        state.buffer = newBuffer;
+        state.view = new DataView(state.buffer.buffer);
     }
 }
 
-export class HBPSerializer {
-    private writer: BufferWriter;
-    private readonly textEncoder: TextEncoder;
+function writeUint8(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 1);
+    state.view.setUint8(state.offset, value);
+    state.offset += 1;
+}
 
-    public constructor() {
-        this.writer = new BufferWriter();
-        this.textEncoder = new TextEncoder();
+function writeInt8(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 1);
+    state.view.setInt8(state.offset, value);
+    state.offset += 1;
+}
+
+function writeUint16(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 2);
+    state.view.setUint16(state.offset, value, false);
+    state.offset += 2;
+}
+
+function writeInt16(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 2);
+    state.view.setInt16(state.offset, value, false);
+    state.offset += 2;
+}
+
+function writeUint32(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 4);
+    state.view.setUint32(state.offset, value, false);
+    state.offset += 4;
+}
+
+function writeInt32(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 4);
+    state.view.setInt32(state.offset, value, false);
+    state.offset += 4;
+}
+
+function writeBigInt64(state: BufferWriterState, value: bigint): void {
+    ensureCapacity(state, 8);
+    state.view.setBigInt64(state.offset, value, false);
+    state.offset += 8;
+}
+
+function writeBigUint64(state: BufferWriterState, value: bigint): void {
+    ensureCapacity(state, 8);
+    state.view.setBigUint64(state.offset, value, false);
+    state.offset += 8;
+}
+
+function writeBigIntBytes(state: BufferWriterState, value: bigint, byteLength: number): void {
+    ensureCapacity(state, byteLength);
+    let tempVal = value;
+    for (let i = byteLength - 1; i >= 0; i--) {
+        const byte = Number(tempVal & 0xFFn);
+        state.view.setUint8(state.offset + i, byte);
+        tempVal >>= 8n;
     }
+    state.offset += byteLength;
+}
 
-    public serialize(data: unknown): Uint8Array {
-        this.writer = new BufferWriter();
-        this.writer.writeUint8(HBPVersion);
-        this.writeAny(data);
-        return this.writer.getResult();
-    }
+function writeFloat32(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 4);
+    state.view.setFloat32(state.offset, value, false);
+    state.offset += 4;
+}
 
-    // Exposed for testing specific markers
-    public serializeValue(data: any, forcedMarker: Marker): Uint8Array {
-        this.writer = new BufferWriter();
-        this.writer.writeUint8(HBPVersion);
-        this.writeExplicit(data, forcedMarker);
-        return this.writer.getResult();
-    }
+function writeFloat64(state: BufferWriterState, value: number): void {
+    ensureCapacity(state, 8);
+    state.view.setFloat64(state.offset, value, false);
+    state.offset += 8;
+}
 
-    private writeExplicit(data: any, marker: Marker): void {
-        this.writer.writeUint8(marker);
-        // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
-        switch (marker) {
-            case Marker.signed_int_8: this.writer.writeInt8(Number(data)); break;
-            case Marker.signed_int_16: this.writer.writeInt16(Number(data)); break;
-            case Marker.signed_int_32: this.writer.writeInt32(Number(data)); break;
-            case Marker.signed_int_64: this.writer.writeBigInt64(BigInt(data as number)); break;
-            case Marker.signed_int_128: this.writer.writeBigIntBytes(BigInt(data as number), 16); break;
-            case Marker.signed_int_256: this.writer.writeBigIntBytes(BigInt(data as number), 32); break;
-            case Marker.signed_int_512: this.writer.writeBigIntBytes(BigInt(data as number), 64); break;
+function writeBuffer(state: BufferWriterState, buf: Uint8Array): void {
+    ensureCapacity(state, buf.length);
+    state.buffer.set(buf, state.offset);
+    state.offset += buf.length;
+}
 
-            case Marker.unsigned_int_8: this.writer.writeUint8(Number(data)); break;
-            case Marker.unsigned_int_16: this.writer.writeUint16(Number(data)); break;
-            case Marker.unsigned_int_32: this.writer.writeUint32(Number(data)); break;
-            case Marker.unsigned_int_64: this.writer.writeBigUint64(BigInt(data as number)); break;
-            case Marker.unsigned_int_128: this.writer.writeBigIntBytes(BigInt(data as number), 16); break;
-            case Marker.unsigned_int_256: this.writer.writeBigIntBytes(BigInt(data as number), 32); break;
-            case Marker.unsigned_int_512: this.writer.writeBigIntBytes(BigInt(data as number), 64); break;
+function getResult(state: BufferWriterState): Uint8Array {
+    return state.buffer.slice(0, state.offset);
+}
 
-            case Marker.signed_int_arbitrary:
-            case Marker.unsigned_int_arbitrary:
-                this.writeArbitraryInt(data as bigint);
-                break;
-            default:
-                // Fallback to auto-detection if strict marker logic isn't defined here
-                this.writeAny(data);
-        }
-    }
+const textEncoder = new TextEncoder();
 
-    private writeAny(data: unknown): void {
-        if (data === null || data === undefined) {
-            this.writer.writeUint8(Marker.null);
+function writeExplicit(
+    state: BufferWriterState,
+    data: string | number | bigint | boolean | object | undefined | null,
+    marker: Marker
+): void {
+    writeUint8(state, marker);
+
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
+    switch (marker) {
+        case Marker.null:
+        case Marker.true:
+        case Marker.false:
             return;
-        }
-
-        const type = typeof data;
-
-        switch (type) {
-            case "boolean":
-                this.writer.writeUint8(data === true ? Marker.true : Marker.false);
-                break;
-            case "number":
-                this.writeNumber(data as number);
-                break;
-            case "string":
-                this.writeString(data as string);
-                break;
-            case "bigint":
-                this.writeBigIntAuto(data as bigint);
-                break;
-            case "object":
-                this.writeObject(data as object);
-                break;
-            case "symbol": { throw new Error('Unsupported type: "symbol"'); }
-            case "undefined": { throw new Error('Unsupported type: "undefined"'); }
-            case "function": { throw new Error('Unsupported type: "function"'); }
-        }
-    }
-
-    private writeNumber(num: number): void {
-        // Default to double for JS numbers to ensure precision/special values (NaN/Infinity) are preserved
-        // Optimization for small integers could go here if desired
-        this.writer.writeUint8(Marker.float_double);
-        this.writer.writeFloat64(num);
-    }
-
-    private writeBigIntAuto(num: bigint): void {
-        if (num < 0n) {
-            // Signed
-            if (num >= -128n) {
-                this.writer.writeUint8(Marker.signed_int_8);
-                this.writer.writeInt8(Number(num));
-            } else if (num >= -32768n) {
-                this.writer.writeUint8(Marker.signed_int_16);
-                this.writer.writeInt16(Number(num));
-            } else if (num >= -2147483648n) {
-                this.writer.writeUint8(Marker.signed_int_32);
-                this.writer.writeInt32(Number(num));
-            } else if (num >= -9223372036854775808n) {
-                this.writer.writeUint8(Marker.signed_int_64);
-                this.writer.writeBigInt64(num);
-            } else if (num >= -(1n << 127n)) {
-                this.writer.writeUint8(Marker.signed_int_128);
-                this.writer.writeBigIntBytes(num, 16);
-            } else if (num >= -(1n << 255n)) {
-                this.writer.writeUint8(Marker.signed_int_256);
-                this.writer.writeBigIntBytes(num, 32);
-            } else if (num >= -(1n << 511n)) {
-                this.writer.writeUint8(Marker.signed_int_512);
-                this.writer.writeBigIntBytes(num, 64);
-            } else {
-                this.writer.writeUint8(Marker.signed_int_arbitrary);
-                this.writeArbitraryInt(num);
+        case Marker.signed_int_8: writeInt8(state, Number(data)); return;
+        case Marker.signed_int_16: writeInt16(state, Number(data)); return;
+        case Marker.signed_int_32: writeInt32(state, Number(data)); return;
+        case Marker.signed_int_64: writeBigInt64(state, BigInt(data as number)); return;
+        case Marker.signed_int_128: writeBigIntBytes(state, BigInt(data as number), 16); return;
+        case Marker.signed_int_256: writeBigIntBytes(state, BigInt(data as number), 32); return;
+        case Marker.signed_int_512: writeBigIntBytes(state, BigInt(data as number), 64); return;
+        case Marker.signed_int_arbitrary: writeArbitraryInt(state, BigInt(data as number)); return;
+        case Marker.unsigned_int_8: writeUint8(state, Number(data)); return;
+        case Marker.unsigned_int_16: writeUint16(state, Number(data)); return;
+        case Marker.unsigned_int_32: writeUint32(state, Number(data)); return;
+        case Marker.unsigned_int_64: writeBigUint64(state, BigInt(data as number)); return;
+        case Marker.unsigned_int_128: writeBigIntBytes(state, BigInt(data as number), 16); return;
+        case Marker.unsigned_int_256: writeBigIntBytes(state, BigInt(data as number), 32); return;
+        case Marker.unsigned_int_512: writeBigIntBytes(state, BigInt(data as number), 64); return;
+        case Marker.unsigned_int_arbitrary: writeArbitraryInt(state, BigInt(data as number)); return;
+        case Marker.float_single: writeFloat32(state, Number(data)); return;
+        case Marker.float_double: writeFloat64(state, Number(data)); return;
+        default:
+            if (marker >= Marker.string_utf8_0 && marker <= Marker.string_utf8_15) {
+                const bytes = textEncoder.encode(String(data as string));
+                writeBuffer(state, bytes);
+                return;
             }
-        } else {
-            // Unsigned preference
-            // eslint-disable-next-line no-lonely-if
-            if (num <= 255n) {
-                this.writer.writeUint8(Marker.unsigned_int_8);
-                this.writer.writeUint8(Number(num));
-            } else if (num <= 65535n) {
-                this.writer.writeUint8(Marker.unsigned_int_16);
-                this.writer.writeUint16(Number(num));
-            } else if (num <= 4294967295n) {
-                this.writer.writeUint8(Marker.unsigned_int_32);
-                this.writer.writeUint32(Number(num));
-            } else if (num <= 18446744073709551615n) {
-                this.writer.writeUint8(Marker.unsigned_int_64);
-                this.writer.writeBigUint64(num);
-            } else if (num < (1n << 128n)) {
-                this.writer.writeUint8(Marker.unsigned_int_128);
-                this.writer.writeBigIntBytes(num, 16);
-            } else if (num < (1n << 256n)) {
-                this.writer.writeUint8(Marker.unsigned_int_256);
-                this.writer.writeBigIntBytes(num, 32);
-            } else if (num < (1n << 512n)) {
-                this.writer.writeUint8(Marker.unsigned_int_512);
-                this.writer.writeBigIntBytes(num, 64);
-            } else {
-                this.writer.writeUint8(Marker.unsigned_int_arbitrary);
-                this.writeArbitraryInt(num);
+
+            if (marker === Marker.string_utf8_255) {
+                const bytes = textEncoder.encode(String(data as string));
+                writeUint8(state, bytes.length);
+                writeBuffer(state, bytes);
+                return;
             }
-        }
+
+            if (marker === Marker.string_utf8_65535) {
+                const bytes = textEncoder.encode(String(data as string));
+                writeUint16(state, bytes.length);
+                writeBuffer(state, bytes);
+                return;
+            }
+
+            if (marker === Marker.string_utf8_4G) {
+                const bytes = textEncoder.encode(String(data as string));
+                writeUint32(state, bytes.length);
+                writeBuffer(state, bytes);
+                return;
+            }
+
+            if (marker >= Marker.tuple_0 && marker <= Marker.tuple_15) {
+                const arr = data as Array<any>;
+                for (const item of arr) writeAny(state, item);
+                return;
+            }
+
+            if (marker === Marker.tuple_255) {
+                const arr = data as Array<any>;
+                writeUint8(state, arr.length);
+                for (const item of arr) writeAny(state, item);
+                return;
+            }
+
+            if (marker === Marker.tuple_65535) {
+                const arr = data as Array<any>;
+                writeUint16(state, arr.length);
+                for (const item of arr) writeAny(state, item);
+                return;
+            }
+
+            if (marker === Marker.tuple_4G) {
+                const arr = data as Array<any>;
+                writeUint32(state, arr.length);
+                for (const item of arr) writeAny(state, item);
+                return;
+            }
+
+            if (marker >= Marker.vector_0 && marker <= Marker.vector_15) {
+                writeVectorData(state, data as ArrayBufferView);
+                return;
+            }
+
+            if (marker === Marker.vector_255) {
+                const view = data as ArrayBufferView;
+                writeUint8(state, view.byteLength);
+                writeVectorData(state, view);
+                return;
+            }
+
+            if (marker === Marker.vector_65535) {
+                const view = data as ArrayBufferView;
+                writeUint16(state, view.byteLength);
+                writeVectorData(state, view);
+                return;
+            }
+
+            if (marker === Marker.vector_4G) {
+                const view = data as ArrayBufferView;
+                writeUint32(state, view.byteLength);
+                writeVectorData(state, view);
+                return;
+            }
+
+            if (marker === Marker.dict_255) {
+                const entries = Object.entries(data as object);
+                writeUint8(state, entries.length);
+                for (const [k, v] of entries) {
+                    writeString(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.dict_65535) {
+                const entries = Object.entries(data as object);
+                writeUint16(state, entries.length);
+                for (const [k, v] of entries) {
+                    writeString(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.dict_4G) {
+                const entries = Object.entries(data as object);
+                writeUint32(state, entries.length);
+                for (const [k, v] of entries) {
+                    writeString(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.map_255) {
+                const map = data as Map<any, any>;
+                writeUint8(state, map.size);
+                for (const [k, v] of map) {
+                    writeAny(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.map_65535) {
+                const map = data as Map<any, any>;
+                writeUint16(state, map.size);
+                for (const [k, v] of map) {
+                    writeAny(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.map_4G) {
+                const map = data as Map<any, any>;
+                writeUint32(state, map.size);
+                for (const [k, v] of map) {
+                    writeAny(state, k);
+                    writeAny(state, v);
+                }
+                return;
+            }
+
+            if (marker === Marker.error) {
+                const err = data as Error;
+                writeString(state, err.message);
+                return;
+            }
+
+            throw new Error(`Marker ${marker} is not supported in serializeValue`);
+    }
+}
+
+function writeVectorData(state: BufferWriterState, view: ArrayBufferView): void {
+    let typeMarker = Marker.null;
+    // eslint-disable-next-line func-style
+    let writerFunc: (val: number) => void = () => { /* empty */ };
+
+    if (view instanceof Int8Array) {
+        typeMarker = Marker.signed_int_8;
+        writerFunc = (v) => { writeInt8(state, v); };
+    } else if (view instanceof Uint8Array) {
+        typeMarker = Marker.unsigned_int_8;
+        writerFunc = (v) => { writeUint8(state, v); };
+    } else if (view instanceof Int16Array) {
+        typeMarker = Marker.signed_int_16;
+        writerFunc = (v) => { writeInt16(state, v); };
+    } else if (view instanceof Uint16Array) {
+        typeMarker = Marker.unsigned_int_16;
+        writerFunc = (v) => { writeUint16(state, v); };
+    } else if (view instanceof Int32Array) {
+        typeMarker = Marker.signed_int_32;
+        writerFunc = (v) => { writeInt32(state, v); };
+    } else if (view instanceof Uint32Array) {
+        typeMarker = Marker.unsigned_int_32;
+        writerFunc = (v) => { writeUint32(state, v); };
+    } else if (view instanceof Float32Array) {
+        typeMarker = Marker.float_single;
+        writerFunc = (v) => { writeFloat32(state, v); };
+    } else if (view instanceof Float64Array) {
+        typeMarker = Marker.float_double;
+        writerFunc = (v) => { writeFloat64(state, v); };
+    } else
+        throw new Error("Unsupported TypedArray for Vector serialization");
+
+    writeUint8(state, typeMarker);
+    for (const item of view) writerFunc(item);
+}
+
+function writeAny(state: BufferWriterState, data: unknown): void {
+    if (data === null || data === undefined) {
+        writeUint8(state, Marker.null);
+        return;
     }
 
-    private writeArbitraryInt(num: bigint): void {
-        const isNegative = num < 0n;
-        if (isNegative) num = -num;
+    const type = typeof data;
 
-        let tmp = num;
-        let byteLen = 0;
-        while (tmp > 0n) {
-            byteLen++;
-            tmp >>= 8n;
-        }
-        if (byteLen === 0) byteLen = 1;
-
-        this.writer.writeUint16(byteLen);
-
-        const buffer = Buffer.allocUnsafe(byteLen);
-        for (let i = byteLen - 1; i >= 0; i--) {
-            buffer[i] = Number(num & 0xFFn);
-            num >>= 8n;
-        }
-
-        for (let i = 0; i < byteLen; i++) this.writer.writeUint8(buffer[i]);
+    switch (type) {
+        case "boolean":
+            writeUint8(state, data === true ? Marker.true : Marker.false);
+            break;
+        case "number":
+            writeNumber(state, data as number);
+            break;
+        case "string":
+            writeString(state, data as string);
+            break;
+        case "bigint":
+            writeBigIntAuto(state, data as bigint);
+            break;
+        case "object":
+            writeObject(state, data as object);
+            break;
+        case "symbol": { throw new Error('Unsupported type: "symbol"'); }
+        case "undefined": { throw new Error('Unsupported type: "undefined"'); }
+        case "function": { throw new Error('Unsupported type: "function"'); }
     }
+}
 
-    private writeString(str: string): void {
-        const bytes = this.textEncoder.encode(str);
-        const len = bytes.length;
+function writeNumber(state: BufferWriterState, num: number): void {
+    writeUint8(state, Marker.float_double);
+    writeFloat64(state, num);
+}
 
-        if (len <= 15)
-            this.writer.writeUint8(Marker.string_utf8_0 + len);
-        else if (len <= 255) {
-            this.writer.writeUint8(Marker.string_utf8_255);
-            this.writer.writeUint8(len);
-        } else if (len <= 65535) {
-            this.writer.writeUint8(Marker.string_utf8_65535);
-            this.writer.writeUint16(len);
+function writeBigIntAuto(state: BufferWriterState, num: bigint): void {
+    if (num < 0n) {
+        if (num >= -128n) {
+            writeUint8(state, Marker.signed_int_8);
+            writeInt8(state, Number(num));
+        } else if (num >= -32768n) {
+            writeUint8(state, Marker.signed_int_16);
+            writeInt16(state, Number(num));
+        } else if (num >= -2147483648n) {
+            writeUint8(state, Marker.signed_int_32);
+            writeInt32(state, Number(num));
+        } else if (num >= -9223372036854775808n) {
+            writeUint8(state, Marker.signed_int_64);
+            writeBigInt64(state, num);
+        } else if (num >= -(1n << 127n)) {
+            writeUint8(state, Marker.signed_int_128);
+            writeBigIntBytes(state, num, 16);
+        } else if (num >= -(1n << 255n)) {
+            writeUint8(state, Marker.signed_int_256);
+            writeBigIntBytes(state, num, 32);
+        } else if (num >= -(1n << 511n)) {
+            writeUint8(state, Marker.signed_int_512);
+            writeBigIntBytes(state, num, 64);
         } else {
-            this.writer.writeUint8(Marker.string_utf8_4G);
-            this.writer.writeUint32(len);
+            writeUint8(state, Marker.signed_int_arbitrary);
+            writeArbitraryInt(state, num);
         }
-        this.writer.writeBuffer(bytes);
-    }
-
-    private writeObject(obj: object): void {
-        if (Array.isArray(obj)) {
-            this.writeTuple(obj);
-            return;
-        }
-
-        if (obj instanceof Map) {
-            this.writeMap(obj);
-            return;
-        }
-
-        if (ArrayBuffer.isView(obj)) {
-            this.writeVector(obj);
-            return;
-        }
-
-        this.writeDictionary(obj);
-    }
-
-    private writeTuple(arr: Array<any>): void {
-        const len = arr.length;
-
-        if (len <= 15)
-            this.writer.writeUint8(Marker.tuple_0 + len);
-        else if (len <= 255) {
-            this.writer.writeUint8(Marker.tuple_255);
-            this.writer.writeUint8(len);
-        } else if (len <= 65535) {
-            this.writer.writeUint8(Marker.tuple_65535);
-            this.writer.writeUint16(len);
+    } else {
+        // eslint-disable-next-line no-lonely-if
+        if (num <= 255n) {
+            writeUint8(state, Marker.unsigned_int_8);
+            writeUint8(state, Number(num));
+        } else if (num <= 65535n) {
+            writeUint8(state, Marker.unsigned_int_16);
+            writeUint16(state, Number(num));
+        } else if (num <= 4294967295n) {
+            writeUint8(state, Marker.unsigned_int_32);
+            writeUint32(state, Number(num));
+        } else if (num <= 18446744073709551615n) {
+            writeUint8(state, Marker.unsigned_int_64);
+            writeBigUint64(state, num);
+        } else if (num < (1n << 128n)) {
+            writeUint8(state, Marker.unsigned_int_128);
+            writeBigIntBytes(state, num, 16);
+        } else if (num < (1n << 256n)) {
+            writeUint8(state, Marker.unsigned_int_256);
+            writeBigIntBytes(state, num, 32);
+        } else if (num < (1n << 512n)) {
+            writeUint8(state, Marker.unsigned_int_512);
+            writeBigIntBytes(state, num, 64);
         } else {
-            this.writer.writeUint8(Marker.tuple_4G);
-            this.writer.writeUint32(len);
-        }
-
-        for (const item of arr) this.writeAny(item);
-    }
-
-    private writeVector(view: ArrayBufferView): void {
-        let len = 0;
-        let typeMarker = Marker.null;
-        // eslint-disable-next-line func-style
-        let writerFunc: (val: number) => void = () => { /* empty */ };
-
-        if (view instanceof Int8Array) {
-            len = view.length;
-            typeMarker = Marker.signed_int_8;
-            writerFunc = (v) => { this.writer.writeInt8(v); };
-        } else if (view instanceof Uint8Array) {
-            len = view.length;
-            typeMarker = Marker.unsigned_int_8;
-            writerFunc = (v) => { this.writer.writeUint8(v); };
-        } else if (view instanceof Int16Array) {
-            len = view.length;
-            typeMarker = Marker.signed_int_16;
-            writerFunc = (v) => { this.writer.writeInt16(v); };
-        } else if (view instanceof Uint16Array) {
-            len = view.length;
-            typeMarker = Marker.unsigned_int_16;
-            writerFunc = (v) => { this.writer.writeUint16(v); };
-        } else if (view instanceof Int32Array) {
-            len = view.length;
-            typeMarker = Marker.signed_int_32;
-            writerFunc = (v) => { this.writer.writeInt32(v); };
-        } else if (view instanceof Uint32Array) {
-            len = view.length;
-            typeMarker = Marker.unsigned_int_32;
-            writerFunc = (v) => { this.writer.writeUint32(v); };
-        } else if (view instanceof Float32Array) {
-            len = view.length;
-            typeMarker = Marker.float_single;
-            writerFunc = (v) => { this.writer.writeFloat32(v); };
-        } else if (view instanceof Float64Array) {
-            len = view.length;
-            typeMarker = Marker.float_double;
-            writerFunc = (v) => { this.writer.writeFloat64(v); };
-        } else
-            throw new Error("Unsupported TypedArray for Vector serialization");
-
-        if (len <= 15)
-            this.writer.writeUint8(Marker.vector_0 + len);
-        else if (len <= 255) {
-            this.writer.writeUint8(Marker.vector_255);
-            this.writer.writeUint8(len);
-        } else if (len <= 65535) {
-            this.writer.writeUint8(Marker.vector_65535);
-            this.writer.writeUint16(len);
-        } else {
-            this.writer.writeUint8(Marker.vector_4G);
-            this.writer.writeUint32(len);
-        }
-
-        this.writer.writeUint8(typeMarker);
-        for (const item of view) writerFunc(item);
-    }
-
-    private writeDictionary(obj: object): void {
-        const entries = Object.entries(obj);
-        const len = entries.length;
-
-        if (len <= 255) {
-            this.writer.writeUint8(Marker.dict_255);
-            this.writer.writeUint8(len);
-        } else if (len <= 65535) {
-            this.writer.writeUint8(Marker.dict_65535);
-            this.writer.writeUint16(len);
-        } else {
-            this.writer.writeUint8(Marker.dict_4G);
-            this.writer.writeUint32(len);
-        }
-
-        for (const [key, value] of entries) {
-            this.writeString(key);
-            this.writeAny(value);
-        }
-    }
-
-    private writeMap(map: Map<any, any>): void {
-        const len = map.size;
-
-        if (len <= 255) {
-            this.writer.writeUint8(Marker.map_255);
-            this.writer.writeUint8(len);
-        } else if (len <= 65535) {
-            this.writer.writeUint8(Marker.map_65535);
-            this.writer.writeUint16(len);
-        } else {
-            this.writer.writeUint8(Marker.map_4G);
-            this.writer.writeUint32(len);
-        }
-
-        for (const [key, value] of map) {
-            this.writeAny(key);
-            this.writeAny(value);
+            writeUint8(state, Marker.unsigned_int_arbitrary);
+            writeArbitraryInt(state, num);
         }
     }
 }
+
+function writeArbitraryInt(state: BufferWriterState, num: bigint): void {
+    const isNegative = num < 0n;
+    if (isNegative) num = -num;
+
+    let tmp = num;
+    let byteLen = 0;
+    while (tmp > 0n) {
+        byteLen++;
+        tmp >>= 8n;
+    }
+    if (byteLen === 0) byteLen = 1;
+
+    writeUint16(state, byteLen);
+
+    const buffer = Buffer.allocUnsafe(byteLen);
+    for (let i = byteLen - 1; i >= 0; i--) {
+        buffer[i] = Number(num & 0xFFn);
+        num >>= 8n;
+    }
+
+    for (let i = 0; i < byteLen; i++) writeUint8(state, buffer[i]);
+}
+
+function writeString(state: BufferWriterState, str: string): void {
+    const bytes = textEncoder.encode(str);
+    const len = bytes.length;
+
+    if (len <= 15)
+        writeUint8(state, Marker.string_utf8_0 + len);
+    else if (len <= 255) {
+        writeUint8(state, Marker.string_utf8_255);
+        writeUint8(state, len);
+    } else if (len <= 65535) {
+        writeUint8(state, Marker.string_utf8_65535);
+        writeUint16(state, len);
+    } else {
+        writeUint8(state, Marker.string_utf8_4G);
+        writeUint32(state, len);
+    }
+    writeBuffer(state, bytes);
+}
+
+function writeObject(state: BufferWriterState, obj: object): void {
+    if (Array.isArray(obj)) {
+        writeTuple(state, obj);
+        return;
+    }
+
+    if (obj instanceof Map) {
+        writeMap(state, obj);
+        return;
+    }
+
+    if (obj instanceof Error) {
+        writeError(state, obj);
+        return;
+    }
+
+    if (ArrayBuffer.isView(obj)) {
+        writeVector(state, obj);
+        return;
+    }
+
+    writeDictionary(state, obj);
+}
+
+function writeTuple(state: BufferWriterState, arr: Array<any>): void {
+    const len = arr.length;
+
+    if (len <= 15)
+        writeUint8(state, Marker.tuple_0 + len);
+    else if (len <= 255) {
+        writeUint8(state, Marker.tuple_255);
+        writeUint8(state, len);
+    } else if (len <= 65535) {
+        writeUint8(state, Marker.tuple_65535);
+        writeUint16(state, len);
+    } else {
+        writeUint8(state, Marker.tuple_4G);
+        writeUint32(state, len);
+    }
+
+    for (const item of arr) writeAny(state, item);
+}
+
+function writeVector(state: BufferWriterState, view: ArrayBufferView): void {
+    let len = 0;
+    let typeMarker = Marker.null;
+    // eslint-disable-next-line func-style
+    let writerFunc: (val: number) => void = () => { /* empty */ };
+
+    if (view instanceof Int8Array) {
+        len = view.length;
+        typeMarker = Marker.signed_int_8;
+        writerFunc = (v) => { writeInt8(state, v); };
+    } else if (view instanceof Uint8Array) {
+        len = view.length;
+        typeMarker = Marker.unsigned_int_8;
+        writerFunc = (v) => { writeUint8(state, v); };
+    } else if (view instanceof Int16Array) {
+        len = view.length;
+        typeMarker = Marker.signed_int_16;
+        writerFunc = (v) => { writeInt16(state, v); };
+    } else if (view instanceof Uint16Array) {
+        len = view.length;
+        typeMarker = Marker.unsigned_int_16;
+        writerFunc = (v) => { writeUint16(state, v); };
+    } else if (view instanceof Int32Array) {
+        len = view.length;
+        typeMarker = Marker.signed_int_32;
+        writerFunc = (v) => { writeInt32(state, v); };
+    } else if (view instanceof Uint32Array) {
+        len = view.length;
+        typeMarker = Marker.unsigned_int_32;
+        writerFunc = (v) => { writeUint32(state, v); };
+    } else if (view instanceof Float32Array) {
+        len = view.length;
+        typeMarker = Marker.float_single;
+        writerFunc = (v) => { writeFloat32(state, v); };
+    } else if (view instanceof Float64Array) {
+        len = view.length;
+        typeMarker = Marker.float_double;
+        writerFunc = (v) => { writeFloat64(state, v); };
+    } else
+        throw new Error("Unsupported TypedArray for Vector serialization");
+
+    if (len <= 15)
+        writeUint8(state, Marker.vector_0 + len);
+    else if (len <= 255) {
+        writeUint8(state, Marker.vector_255);
+        writeUint8(state, len);
+    } else if (len <= 65535) {
+        writeUint8(state, Marker.vector_65535);
+        writeUint16(state, len);
+    } else {
+        writeUint8(state, Marker.vector_4G);
+        writeUint32(state, len);
+    }
+
+    writeUint8(state, typeMarker);
+    for (const item of view) writerFunc(item);
+}
+
+function writeDictionary(state: BufferWriterState, obj: object): void {
+    const entries = Object.entries(obj);
+    const len = entries.length;
+
+    if (len <= 255) {
+        writeUint8(state, Marker.dict_255);
+        writeUint8(state, len);
+    } else if (len <= 65535) {
+        writeUint8(state, Marker.dict_65535);
+        writeUint16(state, len);
+    } else {
+        writeUint8(state, Marker.dict_4G);
+        writeUint32(state, len);
+    }
+
+    for (const [key, value] of entries) {
+        writeString(state, key);
+        writeAny(state, value);
+    }
+}
+
+function writeMap(state: BufferWriterState, map: Map<any, any>): void {
+    const len = map.size;
+
+    if (len <= 255) {
+        writeUint8(state, Marker.map_255);
+        writeUint8(state, len);
+    } else if (len <= 65535) {
+        writeUint8(state, Marker.map_65535);
+        writeUint16(state, len);
+    } else {
+        writeUint8(state, Marker.map_4G);
+        writeUint32(state, len);
+    }
+
+    for (const [key, value] of map) {
+        writeAny(state, key);
+        writeAny(state, value);
+    }
+}
+
+function writeError(state: BufferWriterState, error: Error): void {
+    writeUint8(state, Marker.error);
+    writeString(state, error.message);
+}
+
+type HBPFrameFor<M> = [typeof HBPVersion, M, ...Tail<InferHBPType<M>, Tail<typeof HBPVersion, HBPFrame>>];
+
+export function serialize<T>(data: T): HBPFrameFor<InferHBPType<T>> {
+    const state = createBufferWriter();
+    writeUint8(state, HBPVersion);
+    writeAny(state, data);
+    return getResult(state) as unknown as HBPFrameFor<InferHBPType<T>>;
+}
+
+export function serializeValue<M extends Marker>(
+    data: MarkerToType<M>,
+    forcedMarker: M
+): HBPFrameFor<M> {
+    const state = createBufferWriter();
+    writeUint8(state, HBPVersion);
+    writeExplicit(state, data, forcedMarker);
+    return getResult(state) as unknown as HBPFrameFor<M>;
+}
+

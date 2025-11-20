@@ -1,328 +1,357 @@
-import { HBPVersion, Marker } from "./Specification.js";
+import type { MarkerToType } from "./Serializer.js";
+import type { HBPFrame } from "./Specification.js";
+import {
+    DictExtraByte,
+    FloatByteLength,
+    HBPVersion,
+    LongTupleExtraByte,
+    LongUTF8StringExtraByte,
+    LongVectorExtraByte,
+    MapExtraByte,
+    Marker,
+    SignedIntByteLength,
+    SmallTupleCapacity,
+    SmallUTF8StringCapacity,
+    SmallVectorCapacity,
+    UnsignedIntByteLength
+} from "./Specification.js";
 
-class BufferReader {
-    private readonly view: DataView;
-    private offset: number;
-    private readonly textDecoder: TextDecoder;
+type BufferReaderState = {
+    readonly view: DataView,
+    offset: number,
+    readonly textDecoder: TextDecoder
+};
 
-    public constructor(buffer: Uint8Array) {
-        this.view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        this.offset = 0;
-        this.textDecoder = new TextDecoder("utf-8");
+function createBufferReader(buffer: HBPFrame): BufferReaderState {
+    const buf = new Uint8Array(buffer as Array<any>);
+    return {
+        view: new DataView(buf.buffer, buf.byteOffset, buf.byteLength),
+        offset: 0,
+        textDecoder: new TextDecoder("utf-8")
+    };
+}
+
+export function hasBytes(state: BufferReaderState, n: number): boolean {
+    return state.offset + n <= state.view.byteLength;
+}
+
+function readUint(state: BufferReaderState, bytes: number): number {
+    const method = `getUint${bytes * 8}`;
+    // @ts-expect-error hehe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const val: number = state.view[method](state.offset);
+    state.offset += bytes;
+    return val;
+}
+
+function readInt(state: BufferReaderState, bytes: number): number {
+    const method = `getInt${bytes * 8}`;
+    // @ts-expect-error hehe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const val: number = state.view[method](state.offset);
+    state.offset += bytes;
+    return val;
+}
+
+function readBigInt(state: BufferReaderState, bytes: number): number {
+    const method = `getBigInt${bytes * 8}`;
+    // @ts-expect-error hehe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const val: number = state.view[method](state.offset);
+    state.offset += bytes;
+    return val;
+}
+
+function readBigUint(state: BufferReaderState, bytes: number): number {
+    const method = `getBigUint${bytes * 8}`;
+    // @ts-expect-error hehe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const val: number = state.view[method](state.offset);
+    state.offset += bytes;
+    return val;
+}
+
+function readFloat(state: BufferReaderState, bytes: number): number {
+    const method = `getFloat${bytes * 8}`;
+    // @ts-expect-error hehe
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const val: number = state.view[method](state.offset);
+    state.offset += bytes;
+    return val;
+}
+
+function readBigIntBytesSigned(state: BufferReaderState, len: number): bigint {
+    let val = 0n;
+    const firstByte = state.view.getUint8(state.offset);
+    const isNegative = (firstByte & 0x80) !== 0;
+
+    for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
+
+    state.offset += len;
+
+    if (isNegative) {
+        const limit = 1n << (BigInt(len) * 8n);
+        val -= limit;
     }
+    return val;
+}
 
-    public hasBytes(n: number): boolean {
-        return this.offset + n <= this.view.byteLength;
-    }
+function readBigIntBytesUnsigned(state: BufferReaderState, len: number): bigint {
+    let val = 0n;
+    for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
 
-    public readUint8(): number {
-        const val = this.view.getUint8(this.offset);
-        this.offset += 1;
-        return val;
-    }
+    state.offset += len;
+    return val;
+}
 
-    public readInt8(): number {
-        const val = this.view.getInt8(this.offset);
-        this.offset += 1;
-        return val;
-    }
+function readBytes(state: BufferReaderState, len: number): Uint8Array {
+    const buf = new Uint8Array(state.view.buffer, state.view.byteOffset + state.offset, len);
+    state.offset += len;
+    return buf;
+}
 
-    // Force Big Endian (littleEndian = false)
-    public readUint16(): number {
-        const val = this.view.getUint16(this.offset, false);
-        this.offset += 2;
-        return val;
-    }
+function readString(state: BufferReaderState, len: number): string {
+    const bytes = readBytes(state, len);
+    return state.textDecoder.decode(bytes);
+}
 
-    public readInt16(): number {
-        const val = this.view.getInt16(this.offset, false);
-        this.offset += 2;
-        return val;
-    }
+export function getOffset(state: BufferReaderState): number {
+    return state.offset;
+}
 
-    public readUint32(): number {
-        const val = this.view.getUint32(this.offset, false);
-        this.offset += 4;
-        return val;
-    }
+function parseValue(state: BufferReaderState): string | number | bigint | boolean | object | null {
+    const marker: Marker = readUint(state, 1);
 
-    public readInt32(): number {
-        const val = this.view.getInt32(this.offset, false);
-        this.offset += 4;
-        return val;
-    }
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
+    switch (marker) {
+        case Marker.null: return null;
+        case Marker.false: return false;
+        case Marker.true: return true;
 
-    public readBigInt64(): bigint {
-        const val = this.view.getBigInt64(this.offset, false);
-        this.offset += 8;
-        return val;
-    }
+        case Marker.signed_int_8:
+        case Marker.signed_int_16:
+        case Marker.signed_int_32:
+            return readInt(state, SignedIntByteLength[marker]);
+        case Marker.signed_int_64:
+            return readBigInt(state, SignedIntByteLength[marker]);
 
-    public readBigUint64(): bigint {
-        const val = this.view.getBigUint64(this.offset, false);
-        this.offset += 8;
-        return val;
-    }
+        case Marker.signed_int_128:
+        case Marker.signed_int_256:
+        case Marker.signed_int_512:
+            return readBigIntBytesSigned(state, SignedIntByteLength[marker]);
 
-    public readFloat32(): number {
-        const val = this.view.getFloat32(this.offset, false);
-        this.offset += 4;
-        return val;
-    }
-
-    public readFloat64(): number {
-        const val = this.view.getFloat64(this.offset, false);
-        this.offset += 8;
-        return val;
-    }
-
-    // Helpers for arbitrary int reading in Big Endian
-    public readBigIntBytesSigned(len: number): bigint {
-        let val = 0n;
-        const firstByte = this.view.getUint8(this.offset);
-        const isNegative = (firstByte & 0x80) !== 0;
-
-        for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(this.view.getUint8(this.offset + i));
-
-        this.offset += len;
-
-        if (isNegative) {
-            const limit = 1n << (BigInt(len) * 8n);
-            val -= limit;
+        case Marker.signed_int_arbitrary: {
+            const len = readUint(state, 2);
+            return readBigIntBytesSigned(state, len);
         }
-        return val;
-    }
 
-    public readBigIntBytesUnsigned(len: number): bigint {
-        let val = 0n;
-        for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(this.view.getUint8(this.offset + i));
+        case Marker.unsigned_int_8:
+        case Marker.unsigned_int_16:
+        case Marker.unsigned_int_32:
+            return readUint(state, UnsignedIntByteLength[marker]);
+        case Marker.unsigned_int_64:
+            return readBigUint(state, UnsignedIntByteLength[marker]);
 
-        this.offset += len;
-        return val;
-    }
+        case Marker.unsigned_int_128:
+        case Marker.unsigned_int_256:
+        case Marker.unsigned_int_512:
+            return readBigIntBytesUnsigned(state, UnsignedIntByteLength[marker]);
 
-    public readBytes(len: number): Uint8Array {
-        const buf = new Uint8Array(this.view.buffer, this.view.byteOffset + this.offset, len);
-        this.offset += len;
-        return buf;
-    }
+        case Marker.unsigned_int_arbitrary: {
+            const len = readUint(state, 2);
+            return readBigIntBytesUnsigned(state, len);
+        }
 
-    public readString(len: number): string {
-        const bytes = this.readBytes(len);
-        return this.textDecoder.decode(bytes);
-    }
+        case Marker.float_single:
+        case Marker.float_double:
+            return readFloat(state, FloatByteLength[marker]);
 
-    public getOffset(): number {
-        return this.offset;
+        case Marker.string_utf8_0: return "";
+        case Marker.string_utf8_1:
+        case Marker.string_utf8_2:
+        case Marker.string_utf8_3:
+        case Marker.string_utf8_4:
+        case Marker.string_utf8_5:
+        case Marker.string_utf8_6:
+        case Marker.string_utf8_7:
+        case Marker.string_utf8_8:
+        case Marker.string_utf8_9:
+        case Marker.string_utf8_10:
+        case Marker.string_utf8_11:
+        case Marker.string_utf8_12:
+        case Marker.string_utf8_13:
+        case Marker.string_utf8_14:
+        case Marker.string_utf8_15:
+            return readString(state, SmallUTF8StringCapacity[marker]);
+
+        case Marker.string_utf8_255:
+        case Marker.string_utf8_65535:
+        case Marker.string_utf8_4G:
+            return readString(state, readUint(state, LongUTF8StringExtraByte[marker]));
+
+        case Marker.tuple_0: return [];
+        case Marker.tuple_1:
+        case Marker.tuple_2:
+        case Marker.tuple_3:
+        case Marker.tuple_4:
+        case Marker.tuple_5:
+        case Marker.tuple_6:
+        case Marker.tuple_7:
+        case Marker.tuple_8:
+        case Marker.tuple_9:
+        case Marker.tuple_10:
+        case Marker.tuple_11:
+        case Marker.tuple_12:
+        case Marker.tuple_13:
+        case Marker.tuple_14:
+        case Marker.tuple_15:
+            return parseTuple(state, SmallTupleCapacity[marker]);
+
+        case Marker.tuple_255:
+        case Marker.tuple_65535:
+        case Marker.tuple_4G:
+            return parseTuple(state, readUint(state, LongTupleExtraByte[marker]));
+
+        case Marker.vector_0:
+        case Marker.vector_1:
+        case Marker.vector_2:
+        case Marker.vector_3:
+        case Marker.vector_4:
+        case Marker.vector_5:
+        case Marker.vector_6:
+        case Marker.vector_7:
+        case Marker.vector_8:
+        case Marker.vector_9:
+        case Marker.vector_10:
+        case Marker.vector_11:
+        case Marker.vector_12:
+        case Marker.vector_13:
+        case Marker.vector_14:
+        case Marker.vector_15:
+            return parseVector(state, SmallVectorCapacity[marker]);
+
+        case Marker.vector_255:
+        case Marker.vector_65535:
+        case Marker.vector_4G:
+            return parseVector(state, readUint(state, LongVectorExtraByte[marker]));
+
+        case Marker.dict_255:
+        case Marker.dict_65535:
+        case Marker.dict_4G:
+            return parseDictionary(state, readUint(state, DictExtraByte[marker]));
+
+        case Marker.map_255:
+        case Marker.map_65535:
+        case Marker.map_4G:
+            return parseMap(state, readUint(state, MapExtraByte[marker]));
+
+        case Marker.optional: {
+            const hasValue = readUint(state, 1);
+            if (hasValue) return parseValue(state);
+            return null;
+        }
+
+        case Marker.enum: {
+            return readUint(state, 1);
+        }
+
+        case Marker.error: {
+            const errorMessage = parseValue(state);
+            if (typeof errorMessage !== "string")
+                throw new Error("Error marker must contain a string message");
+
+            return new Error(errorMessage);
+        }
+
+        default:
+            throw new Error(`Unknown or Unimplemented Marker: 0x${marker.toString(16)}`);
     }
 }
 
-export class HBPParser {
-    private readonly reader: BufferReader;
+function parseTuple(state: BufferReaderState, length: number): Array<unknown> {
+    const arr = new Array(length);
+    for (let i = 0; i < length; i++) arr[i] = parseValue(state);
+    return arr;
+}
 
-    public constructor(buffer: Uint8Array) {
-        this.reader = new BufferReader(buffer);
+const ctorMap = {
+    [Marker.signed_int_8]: Int8Array,
+    [Marker.signed_int_16]: Int16Array,
+    [Marker.signed_int_32]: Int32Array,
 
-        const version = this.reader.readUint8();
-        if (version !== HBPVersion)
-            throw new Error(`Unsupported HBP Version: ${version}`);
-    }
+    [Marker.unsigned_int_8]: Uint8Array,
+    [Marker.unsigned_int_16]: Uint16Array,
+    [Marker.unsigned_int_32]: Uint32Array,
 
-    public parse(): any {
-        return this.parseValue();
-    }
+    [Marker.float_single]: Float32Array,
+    [Marker.float_double]: Float64Array
+} as const;
 
-    private parseValue(): string | number | bigint | boolean | object | null {
-        const marker: Marker = this.reader.readUint8();
+function parseVector(state: BufferReaderState, capacity: number): Float32Array | Float64Array | Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array {
+    if (capacity === 0) return new Uint8Array(0);
+    const marker: Marker = readUint(state, 1);
 
-        // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
-        switch (marker) {
-            case Marker.null: return null;
-            case Marker.false: return false;
-            case Marker.true: return true;
-
-            case Marker.signed_int_8: return this.reader.readInt8();
-            case Marker.signed_int_16: return this.reader.readInt16();
-            case Marker.signed_int_32: return this.reader.readInt32();
-            case Marker.signed_int_64: return this.reader.readBigInt64();
-            case Marker.signed_int_128: return this.reader.readBigIntBytesSigned(16);
-            case Marker.signed_int_256: return this.reader.readBigIntBytesSigned(32);
-            case Marker.signed_int_512: return this.reader.readBigIntBytesSigned(64);
-
-            case Marker.signed_int_arbitrary: {
-                const len = this.reader.readUint16();
-                return this.reader.readBigIntBytesSigned(len);
-            }
-
-            case Marker.unsigned_int_8: return this.reader.readUint8();
-            case Marker.unsigned_int_16: return this.reader.readUint16();
-            case Marker.unsigned_int_32: return this.reader.readUint32();
-            case Marker.unsigned_int_64: return this.reader.readBigUint64();
-            case Marker.unsigned_int_128: return this.reader.readBigIntBytesUnsigned(16);
-            case Marker.unsigned_int_256: return this.reader.readBigIntBytesUnsigned(32);
-            case Marker.unsigned_int_512: return this.reader.readBigIntBytesUnsigned(64);
-
-            case Marker.unsigned_int_arbitrary: {
-                const len = this.reader.readUint16();
-                return this.reader.readBigIntBytesUnsigned(len);
-            }
-
-            case Marker.float_single: return this.reader.readFloat32();
-            case Marker.float_double: return this.reader.readFloat64();
-
-            case Marker.string_utf8_0: return "";
-            case Marker.string_utf8_1: return this.reader.readString(1);
-            case Marker.string_utf8_2: return this.reader.readString(2);
-            case Marker.string_utf8_3: return this.reader.readString(3);
-            case Marker.string_utf8_4: return this.reader.readString(4);
-            case Marker.string_utf8_5: return this.reader.readString(5);
-            case Marker.string_utf8_6: return this.reader.readString(6);
-            case Marker.string_utf8_7: return this.reader.readString(7);
-            case Marker.string_utf8_8: return this.reader.readString(8);
-            case Marker.string_utf8_9: return this.reader.readString(9);
-            case Marker.string_utf8_10: return this.reader.readString(10);
-            case Marker.string_utf8_11: return this.reader.readString(11);
-            case Marker.string_utf8_12: return this.reader.readString(12);
-            case Marker.string_utf8_13: return this.reader.readString(13);
-            case Marker.string_utf8_14: return this.reader.readString(14);
-            case Marker.string_utf8_15: return this.reader.readString(15);
-
-            case Marker.string_utf8_255: return this.reader.readString(this.reader.readUint8());
-            case Marker.string_utf8_65535: return this.reader.readString(this.reader.readUint16());
-            case Marker.string_utf8_4G: return this.reader.readString(this.reader.readUint32());
-
-            case Marker.tuple_0: return [];
-            case Marker.tuple_1: return this.parseTuple(1);
-            case Marker.tuple_2: return this.parseTuple(2);
-            case Marker.tuple_3: return this.parseTuple(3);
-            case Marker.tuple_4: return this.parseTuple(4);
-            case Marker.tuple_5: return this.parseTuple(5);
-            case Marker.tuple_6: return this.parseTuple(6);
-            case Marker.tuple_7: return this.parseTuple(7);
-            case Marker.tuple_8: return this.parseTuple(8);
-            case Marker.tuple_9: return this.parseTuple(9);
-            case Marker.tuple_10: return this.parseTuple(10);
-            case Marker.tuple_11: return this.parseTuple(11);
-            case Marker.tuple_12: return this.parseTuple(12);
-            case Marker.tuple_13: return this.parseTuple(13);
-            case Marker.tuple_14: return this.parseTuple(14);
-            case Marker.tuple_15: return this.parseTuple(15);
-
-            case Marker.tuple_255: return this.parseTuple(this.reader.readUint8());
-            case Marker.tuple_65535: return this.parseTuple(this.reader.readUint16());
-            case Marker.tuple_4G: return this.parseTuple(this.reader.readUint32());
-
-            case Marker.vector_0: return this.parseVector(0);
-            case Marker.vector_1: return this.parseVector(1);
-            case Marker.vector_2: return this.parseVector(2);
-            case Marker.vector_3: return this.parseVector(3);
-            case Marker.vector_4: return this.parseVector(4);
-            case Marker.vector_5: return this.parseVector(5);
-            case Marker.vector_6: return this.parseVector(6);
-            case Marker.vector_7: return this.parseVector(7);
-            case Marker.vector_8: return this.parseVector(8);
-            case Marker.vector_9: return this.parseVector(9);
-            case Marker.vector_10: return this.parseVector(10);
-            case Marker.vector_11: return this.parseVector(11);
-            case Marker.vector_12: return this.parseVector(12);
-            case Marker.vector_13: return this.parseVector(13);
-            case Marker.vector_14: return this.parseVector(14);
-            case Marker.vector_15: return this.parseVector(15);
-
-            case Marker.vector_255: return this.parseVector(this.reader.readUint8());
-            case Marker.vector_65535: return this.parseVector(this.reader.readUint16());
-            case Marker.vector_4G: return this.parseVector(this.reader.readUint32());
-
-            case Marker.dict_255: return this.parseDictionary(this.reader.readUint8());
-            case Marker.dict_65535: return this.parseDictionary(this.reader.readUint16());
-            case Marker.dict_4G: return this.parseDictionary(this.reader.readUint32());
-
-            case Marker.map_255: return this.parseMap(this.reader.readUint8());
-            case Marker.map_65535: return this.parseMap(this.reader.readUint16());
-            case Marker.map_4G: return this.parseMap(this.reader.readUint32());
-
-            default:
-                throw new Error(`Unknown or Unimplemented Marker: 0x${marker.toString(16)}`);
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
+    switch (marker) {
+        case Marker.signed_int_8:
+        case Marker.signed_int_16:
+        case Marker.signed_int_32: {
+            const arr = new ctorMap[marker](capacity);
+            const byteLength = SignedIntByteLength[marker];
+            for (let i = 0; i < capacity; i++) arr[i] = readInt(state, byteLength);
+            return arr;
         }
-    }
-
-    private parseTuple<T>(length: number): Array<T> {
-        const arr = new Array(length);
-        for (let i = 0; i < length; i++) arr[i] = this.parseValue();
-
-        return arr as Array<T>;
-    }
-
-    private parseVector(length: number): Float32Array | Float64Array | Int8Array | Uint8Array | Int16Array | Uint16Array | Int32Array | Uint32Array {
-        if (length === 0) return new Uint8Array(0);
-        const typeMarker: Marker = this.reader.readUint8();
-
-        // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
-        switch (typeMarker) {
-            case Marker.signed_int_8: {
-                const arr = new Int8Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readInt8();
-                return arr;
-            }
-            case Marker.unsigned_int_8: {
-                const arr = new Uint8Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readUint8();
-                return arr;
-            }
-            case Marker.signed_int_16: {
-                const arr = new Int16Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readInt16();
-                return arr;
-            }
-            case Marker.unsigned_int_16: {
-                const arr = new Uint16Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readUint16();
-                return arr;
-            }
-            case Marker.signed_int_32: {
-                const arr = new Int32Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readInt32();
-                return arr;
-            }
-            case Marker.unsigned_int_32: {
-                const arr = new Uint32Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readUint32();
-                return arr;
-            }
-            case Marker.float_single: {
-                const arr = new Float32Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readFloat32();
-                return arr;
-            }
-            case Marker.float_double: {
-                const arr = new Float64Array(length);
-                for (let i = 0; i < length; i++) arr[i] = this.reader.readFloat64();
-                return arr;
-            }
-            default:
-                throw new Error(`Unimplemented Vector Type: 0x${typeMarker.toString(16)}`);
+        case Marker.unsigned_int_8:
+        case Marker.unsigned_int_16:
+        case Marker.unsigned_int_32: {
+            const arr = new ctorMap[marker](capacity);
+            const byteLength = UnsignedIntByteLength[marker];
+            for (let i = 0; i < capacity; i++) arr[i] = readUint(state, byteLength);
+            return arr;
         }
-    }
-
-    private parseDictionary(length: number): object {
-        const obj: Record<string, any> = {};
-        for (let i = 0; i < length; i++) {
-            const key = this.parseValue();
-            if (typeof key !== "string") throw new Error("Dictionary key must be a string");
-
-            const value = this.parseValue();
-            obj[key] = value;
+        case Marker.float_single:
+        case Marker.float_double: {
+            const arr = new ctorMap[marker](capacity);
+            const byteLength = FloatByteLength[marker];
+            for (let i = 0; i < capacity; i++) arr[i] = readFloat(state, byteLength);
+            return arr;
         }
-        return obj;
-    }
-
-    private parseMap(length: number): Map<any, any> {
-        const map = new Map();
-        for (let i = 0; i < length; i++) {
-            const key = this.parseValue();
-            const value = this.parseValue();
-            map.set(key, value);
-        }
-        return map;
+        default:
+            throw new Error(`Unimplemented Vector Type: 0x${marker.toString(16)}`);
     }
 }
+
+function parseDictionary(state: BufferReaderState, length: number): object {
+    const obj: Record<string, any> = {};
+    for (let i = 0; i < length; i++) {
+        const key = parseValue(state);
+        if (typeof key !== "string")
+            throw new Error("Dictionary key must be a string");
+
+        const value = parseValue(state);
+        obj[key] = value;
+    }
+    return obj;
+}
+
+function parseMap(state: BufferReaderState, length: number): Map<any, any> {
+    const map = new Map();
+    for (let i = 0; i < length; i++) {
+        const [key, value] = [parseValue(state), parseValue(state)];
+        map.set(key, value);
+    }
+    return map;
+}
+
+type MarkerFromFrame<F extends HBPFrame> = F extends [typeof HBPVersion, infer M, ...infer _] ? M : never;
+
+export function parse<F extends HBPFrame, M extends Marker = MarkerFromFrame<F>>(buffer: F): MarkerToType<M> {
+    const state = createBufferReader(buffer);
+
+    const version = readUint(state, 1);
+    if (version !== HBPVersion)
+        throw new Error(`Unsupported HBP Version: ${version}`);
+
+    return parseValue(state) as MarkerToType<M>;
+}
+
