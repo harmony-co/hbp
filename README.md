@@ -150,7 +150,7 @@ The enum marker must **always** be followed by an integer marker to indicate the
 
 Marker: `E2`
 
-The union marker is **always** followed by a string marker indicating the active tag followed by the union data.
+The union marker is **always** followed by an integer marker indicating the active tag followed by the union data.
 
 ## Error
 

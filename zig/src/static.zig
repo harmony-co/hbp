@@ -19,14 +19,21 @@ pub const ParseOptions = struct {
     } = .@"error",
 };
 
-pub fn parseFromSlice(comptime T: type, slice: []const u8, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
+fn ParseOutputType(comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        .int => alignIntegerType(T),
+        else => T,
+    };
+}
+
+pub fn parseFromSlice(comptime T: type, slice: []const u8, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     var scanner: Scanner = .init(slice);
     defer scanner.deinit();
 
     return parseFromTokenSource(T, &scanner, gpa, options);
 }
 
-pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
+pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     assert(try scanner.next() == .identifier);
     const value = try innerParse(T, scanner, gpa, options);
     assert(try scanner.next() == .eos);
@@ -34,7 +41,7 @@ pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, gpa: std.mem.Al
 }
 
 /// Allocator is only used for dynamic slices and strings
-pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
+pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     switch (@typeInfo(T)) {
         .void => return,
         .null => {
@@ -102,14 +109,14 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, c
             }
         },
         .@"union" => |union_info| {
-            if (union_info.tag_type == null) @compileError("Unable to parse into untagged union '" ++ @typeName(T) ++ "'");
-            const token = try scanner.next();
-            if (token != .@"union") return error.UnexpectedToken;
-            const union_key = try innerParse([]const u8, scanner, gpa, options);
-            defer gpa.free(union_key);
-            inline for (union_info.fields) |field| {
-                if (std.mem.eql(u8, field.name, union_key)) return @unionInit(T, field.name, try innerParse(field.type, scanner, gpa, options));
-            }
+            if (union_info.tag_type) |tag_type| {
+                const token = try scanner.next();
+                if (token != .@"union") return error.UnexpectedToken;
+                const union_tag = try innerParse(@typeInfo(tag_type).@"enum".tag_type, scanner, gpa, options);
+                inline for (union_info.fields) |field| {
+                    if (std.mem.eql(u8, field.name, @tagName(@as(tag_type, @enumFromInt(union_tag))))) return @unionInit(T, field.name, try innerParse(field.type, scanner, gpa, options));
+                }
+            } else @compileError("Unable to parse into untagged union '" ++ @typeName(T) ++ "'");
 
             return error.InvalidUnion;
         },

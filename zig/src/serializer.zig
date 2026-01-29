@@ -129,7 +129,7 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
                 inline for (union_info.fields) |field| {
                     if (value == @field(tag_type, field.name)) {
                         try writer.writeByte(@intFromEnum(MarkerType.@"union"));
-                        try innerSerialize([]const u8, @tagName(value), writer);
+                        try innerSerialize(@typeInfo(tag_type).@"enum".tag_type, @intFromEnum(value), writer);
                         try innerSerialize(field.type, @field(value, field.name), writer);
                     }
                 }
