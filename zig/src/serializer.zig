@@ -86,7 +86,7 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
                                 try writeVectorMarker(value, writer);
                                 try writer.writeByte(getFloatMarker(float));
                                 for (value) |val| {
-                                    try writeInt(std.math.ByteAlignedInt(pointer_info.child), val, writer);
+                                    try writeFloat(std.math.ByteAlignedInt(pointer_info.child), val, writer);
                                 }
                             },
                             .bool => {
