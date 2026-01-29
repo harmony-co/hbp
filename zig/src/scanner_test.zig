@@ -1,6 +1,6 @@
 const std = @import("std");
 const Scanner = @import("Scanner.zig");
-const Serializer = @import("Serializer.zig");
+const Serializer = @import("./serializer.zig");
 const Token = Scanner.Token;
 
 const expect = std.testing.expect;
@@ -33,20 +33,20 @@ test "bool" {
 
 test "int" {
     const test_input = [_][]const u8{
-        &Serializer.serializeInt(i8, 45),
-        &Serializer.serializeInt(i16, 6347),
-        &Serializer.serializeInt(i32, 9123424),
-        &Serializer.serializeInt(i64, 5294967295),
-        &Serializer.serializeInt(i128, 28446744073709551615),
-        &Serializer.serializeInt(i256, 340282366920938463463375607431768211456),
-        &Serializer.serializeInt(i512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
-        &Serializer.serializeInt(u8, 250),
-        &Serializer.serializeInt(u16, 6347),
-        &Serializer.serializeInt(u32, 9123424),
-        &Serializer.serializeInt(u64, 5294967295),
-        &Serializer.serializeInt(u128, 28446744073709551615),
-        &Serializer.serializeInt(u256, 340282366920938463463375607431768211456),
-        &Serializer.serializeInt(u512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
+        Serializer.serializeComptime(i8, 45),
+        Serializer.serializeComptime(i16, 6347),
+        Serializer.serializeComptime(i32, 9123424),
+        Serializer.serializeComptime(i64, 5294967295),
+        Serializer.serializeComptime(i128, 28446744073709551615),
+        Serializer.serializeComptime(i256, 340282366920938463463375607431768211456),
+        Serializer.serializeComptime(i512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
+        Serializer.serializeComptime(u8, 250),
+        Serializer.serializeComptime(u16, 6347),
+        Serializer.serializeComptime(u32, 9123424),
+        Serializer.serializeComptime(u64, 5294967295),
+        Serializer.serializeComptime(u128, 28446744073709551615),
+        Serializer.serializeComptime(u256, 340282366920938463463375607431768211456),
+        Serializer.serializeComptime(u512, 115792089237316395423570985008687907853269984665640564039457584007913129639935),
     };
     const test_output = [_]Token{
         Token{ .int = .{ .signedness = .signed, .view = &.{0x2D} } },

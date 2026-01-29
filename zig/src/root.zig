@@ -6,4 +6,4 @@ pub const parseFromTokenSource = static.parseFromTokenSource;
 pub const innerParse = static.innerParse;
 
 pub const Scanner = @import("./Scanner.zig");
-pub const Serializer = @import("./Serializer.zig");
+pub const serialize = @import("./serializer.zig").serialize;

@@ -181,10 +181,10 @@ fn sliceToInt(comptime T: type, slice: []const u8) alignIntegerType(T) {
 
     if (slice.len < byte_length) {
         var buf = std.mem.zeroes([byte_length]u8);
-        @memcpy(buf[byte_length - slice.len ..], slice);
-        return std.mem.readInt(N, &buf, .big);
+        @memcpy(buf[0..slice.len], slice);
+        return std.mem.readInt(N, &buf, .little);
     }
 
     assert(slice.len == byte_length);
-    return std.mem.readInt(N, slice[0..byte_length], .big);
+    return std.mem.readInt(N, slice[0..byte_length], .little);
 }

@@ -196,19 +196,19 @@ pub fn next(self: *Scanner) !Token {
                 // But since its not yet documented we aren't implementing it fully
                 .arbitrary_string_1 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u8, self.input[self.cursor]);
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
                     self.cursor += 1;
                     return self.parseStringState(byte_length);
                 },
                 .arbitrary_string_2 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
                     self.cursor += 2;
                     return self.parseStringState(byte_length);
                 },
                 .arbitrary_string_4 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
                     self.cursor += 4;
                     return self.parseStringState(byte_length);
                 },
@@ -235,37 +235,37 @@ pub fn next(self: *Scanner) !Token {
                 },
                 .arbitrary_tuple_1 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u8, self.input[self.cursor]);
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
                     self.cursor += 1;
                     return self.parseTupleState(byte_length);
                 },
                 .arbitrary_tuple_2 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
                     self.cursor += 2;
                     return self.parseTupleState(byte_length);
                 },
                 .arbitrary_tuple_4 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
                     self.cursor += 4;
                     return self.parseTupleState(byte_length);
                 },
                 .arbitrary_dict_1 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u8, self.input[self.cursor]);
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
                     self.cursor += 1;
                     return self.parseStructState(byte_length);
                 },
                 .arbitrary_dict_2 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
                     self.cursor += 2;
                     return self.parseStructState(byte_length);
                 },
                 .arbitrary_dict_4 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
                     self.cursor += 4;
                     return self.parseStructState(byte_length);
                 },
@@ -306,7 +306,7 @@ pub fn next(self: *Scanner) !Token {
             };
         },
         .arbitrary_int, .arbitrary_uint => {
-            const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+            const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
             self.cursor += 2;
             const value_start = self.cursor;
             self.cursor += byte_length;
