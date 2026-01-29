@@ -20,7 +20,7 @@ pub fn deinit(self: *Scanner) void {
 
 pub fn peekNextTokenType(self: *Scanner) !TokenType {
     switch (self.state) {
-        .marker => {
+        .marker, .post_value => {
             const m = std.enums.fromInt(MarkerType, self.input[self.cursor]) orelse return error.UnknownMarker;
             return switch (m) {
                 .null => .null,
