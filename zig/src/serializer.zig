@@ -26,6 +26,7 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
     const type_info = @typeInfo(T);
 
     switch (type_info) {
+        .void => return,
         .optional => |optional_info| {
             try writer.writeByte(@intFromEnum(MarkerType.optional));
             if (value) |opt| {
@@ -44,59 +45,76 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
             const aligned_type = std.math.ByteAlignedInt(T);
             const int = @typeInfo(aligned_type).int;
 
-            const marker = blk: {
-                const base = @intFromEnum(if (int.signedness == .unsigned) MarkerType.unsigned_int_8 else MarkerType.signed_int_8);
-
-                break :blk switch (int.bits) {
-                    8 => base,
-                    16 => base + 1,
-                    32 => base + 2,
-                    64 => base + 3,
-                    128 => base + 4,
-                    256 => base + 5,
-                    512 => base + 6,
-                    else => base + 0x0F,
-                };
-            };
-
+            const marker = getIntMarker(int);
             try writer.writeByte(marker);
             if (marker & 0x0F == 0x0F) try writer.writeAll(&@as([2]u8, @bitCast(std.mem.nativeToLittle(u16, @divExact(int.bits, 8)))));
             try writeInt(aligned_type, value, writer);
         },
         // TODO: How are we supporting our other float types?
         .float => |float_info| {
-            const marker = switch (float_info.bits) {
-                16 => @intFromEnum(MarkerType.half_float),
-                32 => @intFromEnum(MarkerType.single_float),
-                64 => @intFromEnum(MarkerType.double_float),
-                80 => @intFromEnum(MarkerType.extended_float_80),
-                128 => @intFromEnum(MarkerType.quadruple_float),
-                else => unreachable,
-            };
-
-            try writer.writeByte(marker);
-            try writer.writeAll(&@as([@divExact(float_info.bits, 8)]u8, @bitCast(std.mem.nativeToLittle(T, value))));
+            try writer.writeByte(getFloatMarker(float_info));
+            try writeFloat(T, value, writer);
         },
         .pointer => |pointer_info| {
             switch (pointer_info.size) {
                 .slice => {
-                    // ! This check is erroneous
-                    // Right now we assume all slices ([]const u8) are strings
-                    std.debug.assert(pointer_info.child == u8);
-                    if (value.len <= 15) {
-                        try writer.writeByte(@intFromEnum(MarkerType.empty_string) + value.len);
-                    } else if (value.len <= std.math.maxInt(u8)) {
-                        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_1));
-                        try writeInt(u8, @intCast(value.len), writer);
-                    } else if (value.len <= std.math.maxInt(u16)) {
-                        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_2));
-                        try writeInt(u16, @intCast(value.len), writer);
-                    } else if (value.len <= std.math.maxInt(u32)) {
-                        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_4));
-                        try writeInt(u32, @intCast(value.len), writer);
-                    }
+                    if (pointer_info.is_const and pointer_info.child == u8) {
+                        if (value.len <= 15) {
+                            try writer.writeByte(@intFromEnum(MarkerType.empty_string) + value.len);
+                        } else if (value.len <= std.math.maxInt(u8)) {
+                            try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_1));
+                            try writeInt(u8, @intCast(value.len), writer);
+                        } else if (value.len <= std.math.maxInt(u16)) {
+                            try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_2));
+                            try writeInt(u16, @intCast(value.len), writer);
+                        } else if (value.len <= std.math.maxInt(u32)) {
+                            try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_4));
+                            try writeInt(u32, @intCast(value.len), writer);
+                        }
 
-                    try writer.writeAll(value);
+                        try writer.writeAll(value);
+                    } else {
+                        switch (@typeInfo(pointer_info.child)) {
+                            .int => |int| {
+                                try writeVectorMarker(value, writer);
+                                try writer.writeByte(getIntMarker(int));
+                                for (value) |val| {
+                                    try writeInt(std.math.ByteAlignedInt(pointer_info.child), val, writer);
+                                }
+                            },
+                            .float => |float| {
+                                try writeVectorMarker(value, writer);
+                                try writer.writeByte(getFloatMarker(float));
+                                for (value) |val| {
+                                    try writeInt(std.math.ByteAlignedInt(pointer_info.child), val, writer);
+                                }
+                            },
+                            .bool => {
+                                try writeVectorMarker(value, writer);
+                                for (value) |val| {
+                                    try writer.writeByte(0x01 + @as(u8, @intFromBool(val)));
+                                }
+                            },
+                            else => {
+                                if (value.len <= 15) {
+                                    try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + value.len);
+                                } else if (value.len <= std.math.maxInt(u8)) {
+                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_1));
+                                    try writeInt(u8, @intCast(value.len), writer);
+                                } else if (value.len <= std.math.maxInt(u16)) {
+                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_2));
+                                    try writeInt(u16, @intCast(value.len), writer);
+                                } else if (value.len <= std.math.maxInt(u32)) {
+                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_4));
+                                    try writeInt(u32, @intCast(value.len), writer);
+                                }
+
+                                for (value) |val| {
+                                    try innerSerialize(pointer_info.child, val, writer);
+                                }
+                            },
+                        }
+                    }
                 },
                 else => @compileError("Unsupported pointer type"),
             }
@@ -159,4 +177,49 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
 
 fn writeInt(comptime T: type, value: T, writer: *std.Io.Writer) !void {
     try writer.writeAll(&@as([@divExact(@typeInfo(T).int.bits, 8)]u8, @bitCast(std.mem.nativeToLittle(T, @intCast(value)))));
+}
+
+fn writeFloat(comptime T: type, value: T, writer: *std.Io.Writer) !void {
+    try writer.writeAll(&@as([@divExact(@typeInfo(T).float.bits, 8)]u8, @bitCast(std.mem.nativeToLittle(T, value))));
+}
+
+fn writeVectorMarker(value: anytype, writer: *std.Io.Writer) !void {
+    if (value.len <= 15) {
+        try writer.writeByte(@intFromEnum(MarkerType.empty_vector) + value.len);
+    } else if (value.len <= std.math.maxInt(u8)) {
+        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_vector_1));
+        try writeInt(u8, @intCast(value.len), writer);
+    } else if (value.len <= std.math.maxInt(u16)) {
+        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_vector_2));
+        try writeInt(u16, @intCast(value.len), writer);
+    } else if (value.len <= std.math.maxInt(u32)) {
+        try writer.writeByte(@intFromEnum(MarkerType.arbitrary_vector_4));
+        try writeInt(u32, @intCast(value.len), writer);
+    }
+}
+
+fn getIntMarker(int: std.builtin.Type.Int) u8 {
+    const base = @intFromEnum(if (int.signedness == .unsigned) MarkerType.unsigned_int_8 else MarkerType.signed_int_8);
+
+    return switch (int.bits) {
+        8 => base,
+        16 => base + 1,
+        32 => base + 2,
+        64 => base + 3,
+        128 => base + 4,
+        256 => base + 5,
+        512 => base + 6,
+        else => base + 0x0F,
+    };
+}
+
+fn getFloatMarker(float: std.builtin.Type.Float) u8 {
+    return switch (float.bits) {
+        16 => @intFromEnum(MarkerType.half_float),
+        32 => @intFromEnum(MarkerType.single_float),
+        64 => @intFromEnum(MarkerType.double_float),
+        80 => @intFromEnum(MarkerType.extended_float_80),
+        128 => @intFromEnum(MarkerType.quadruple_float),
+        else => unreachable,
+    };
 }

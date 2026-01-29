@@ -251,6 +251,45 @@ pub fn next(self: *Scanner) !Token {
                     self.cursor += 4;
                     return self.parseTupleState(byte_length);
                 },
+                .empty_vector,
+                .vector_1,
+                .vector_2,
+                .vector_3,
+                .vector_4,
+                .vector_5,
+                .vector_6,
+                .vector_7,
+                .vector_8,
+                .vector_9,
+                .vector_10,
+                .vector_11,
+                .vector_12,
+                .vector_13,
+                .vector_14,
+                .vector_15,
+                => {
+                    const byte_length = self.input[self.cursor] - 0x80;
+                    self.cursor += 1;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_vector_1 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
+                    self.cursor += 1;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_vector_2 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    self.cursor += 2;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_vector_4 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    self.cursor += 4;
+                    return self.parseVectorState(byte_length);
+                },
                 .arbitrary_dict_1 => {
                     self.cursor += 1;
                     const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
@@ -350,6 +389,11 @@ fn parseStringState(self: *Scanner, byte_length: u32) Token {
 fn parseTupleState(self: *Scanner, byte_length: u32) Token {
     self.state = if (byte_length == 0) .post_value else .marker;
     return .{ .tuple = byte_length };
+}
+
+fn parseVectorState(self: *Scanner, elements: u32) Token {
+    self.state = if (elements == 0) .post_value else .marker;
+    return .{ .vector = elements };
 }
 
 fn parseStructState(self: *Scanner, kv_pairs: u32) Token {
@@ -476,6 +520,7 @@ pub const TokenType = enum {
     float,
     string,
     tuple,
+    vector,
     @"struct",
     optional,
     @"enum",
@@ -498,6 +543,7 @@ pub const Token = union(TokenType) {
     },
     string: u32,
     tuple: u32,
+    vector: u32,
     @"struct": u32,
     optional,
     @"enum",

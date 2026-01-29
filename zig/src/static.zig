@@ -4,10 +4,6 @@ const Scanner = @import("Scanner.zig");
 const assert = std.debug.assert;
 
 pub const ParseOptions = struct {
-    string_behavior: union(enum(u1)) {
-        reference: void,
-        dupe: std.mem.Allocator,
-    } = .{ .reference = {} },
     /// Allow parsing `i8` as `u8` and vice-versa
     ignore_integer_signedness: bool = false,
     /// Use `std.enums.fromInt` instead of attempting to cast
@@ -23,22 +19,24 @@ pub const ParseOptions = struct {
     } = .@"error",
 };
 
-pub fn parseFromSlice(comptime T: type, slice: []const u8, comptime options: ParseOptions) !T {
+pub fn parseFromSlice(comptime T: type, slice: []const u8, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
     var scanner: Scanner = .init(slice);
     defer scanner.deinit();
 
-    return parseFromTokenSource(T, &scanner, options);
+    return parseFromTokenSource(T, &scanner, gpa, options);
 }
 
-pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
+pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
     assert(try scanner.next() == .identifier);
-    const value = try innerParse(T, scanner, options);
+    const value = try innerParse(T, scanner, gpa, options);
     assert(try scanner.next() == .eos);
     return value;
 }
 
-pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
+/// Allocator is only used for dynamic slices and strings
+pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !T {
     switch (@typeInfo(T)) {
+        .void => return,
         .null => {
             return switch (try scanner.next()) {
                 .null => null,
@@ -87,9 +85,9 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
                         return null;
                     }
 
-                    return try innerParse(optional.child, scanner, options);
+                    return try innerParse(optional.child, scanner, gpa, options);
                 },
-                else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, options) else error.UnexpectedToken,
+                else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, gpa, options) else error.UnexpectedToken,
             }
         },
         .@"enum" => |enum_info| {
@@ -107,29 +105,91 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
             if (union_info.tag_type == null) @compileError("Unable to parse into untagged union '" ++ @typeName(T) ++ "'");
             const token = try scanner.next();
             if (token != .@"union") return error.UnexpectedToken;
-            const union_key = try innerParse([]const u8, scanner, options);
+            const union_key = try innerParse([]const u8, scanner, gpa, options);
+            defer gpa.free(union_key);
             inline for (union_info.fields) |field| {
-                if (std.mem.eql(u8, field.name, union_key)) return @unionInit(T, field.name, try innerParse(field.type, scanner, options));
+                if (std.mem.eql(u8, field.name, union_key)) return @unionInit(T, field.name, try innerParse(field.type, scanner, gpa, options));
             }
 
             return error.InvalidUnion;
         },
         .pointer => |pointer_info| {
-            // TODO: Strings should probably be namespaced...
-            // As of now we assume all `[]const u8` types are strings which is wrong (?)
-            // We could force a unique sentinel to decide on this (DEL code point could work?)
-            if (pointer_info.size != .slice or !pointer_info.is_const) @compileError("Unsupported pointer type");
-            assert(pointer_info.child == u8);
-            const token = try scanner.next();
-            if (token != .string) return error.UnexpectedToken;
+            switch (pointer_info.size) {
+                .slice => {
+                    if (pointer_info.is_const and pointer_info.child == u8) {
+                        const token = try scanner.next();
+                        if (token != .string) return error.UnexpectedToken;
 
-            const str = switch (options.string_behavior) {
-                .reference => scanner.input[scanner.cursor .. scanner.cursor + token.string],
-                .dupe => |gpa| try gpa.dupe(u8, scanner.input[scanner.cursor .. scanner.cursor + token.string]),
-            };
-            scanner.cursor += token.string;
-            scanner.state = .post_value;
-            return str;
+                        const str = try gpa.dupe(u8, scanner.input[scanner.cursor .. scanner.cursor + token.string]);
+                        scanner.cursor += token.string;
+                        scanner.state = .post_value;
+                        return str;
+                    }
+
+                    switch (@typeInfo(pointer_info.child)) {
+                        .int => |int| {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+
+                            const first = try scanner.next();
+                            if (first != .int) return error.UnexpectedToken;
+
+                            if (comptime !options.ignore_integer_signedness) {
+                                if (first.int.signedness != int.signedness) return error.WrongIntegerType;
+                            }
+
+                            const element_byte_length = first.int.view.len;
+                            const N = alignIntegerType(pointer_info.child);
+                            var arr: std.ArrayList(N) = try .initCapacity(gpa, 1);
+
+                            try arr.append(gpa, sliceToInt(N, first.int.view));
+
+                            // The first element is already retrieved
+                            for (1..token.vector) |_| {
+                                const value_start = scanner.cursor;
+                                scanner.cursor += element_byte_length;
+                                try arr.append(gpa, sliceToInt(N, scanner.input[value_start..scanner.cursor]));
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        .float => {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+                            var arr: std.ArrayList(pointer_info.child) = .empty;
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        .bool => {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+                            var arr: std.ArrayList(bool) = .empty;
+
+                            for (0..token.tuple) |_| {
+                                const b = try scanner.next();
+                                if (b != .bool) return error.UnexpectedToken;
+                                try arr.append(gpa, switch (b.bool) {
+                                    .false => false,
+                                    .true => true,
+                                });
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        else => {
+                            const token = try scanner.next();
+                            if (token != .tuple) return error.UnexpectedToken;
+                            var arr: std.ArrayList(pointer_info.child) = .empty;
+
+                            for (0..token.tuple) |_| {
+                                try arr.append(gpa, try innerParse(pointer_info.child, scanner, gpa, options));
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                    }
+                },
+                else => @compileError("Unsupported pointer type"),
+            }
         },
         .@"struct" => |struct_info| {
             if (struct_info.is_tuple) {
@@ -140,7 +200,7 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
                 var r: T = undefined;
 
                 inline for (struct_info.fields, 0..) |field, i| {
-                    r[i] = try innerParse(field.type, scanner, options);
+                    r[i] = try innerParse(field.type, scanner, gpa, options);
                 }
 
                 return r;
@@ -152,10 +212,11 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
             var r: T = undefined;
 
             for (0..token.@"struct") |_| {
-                const field_name = try innerParse([]const u8, scanner, options);
+                const field_name = try innerParse([]const u8, scanner, gpa, options);
+                defer gpa.free(field_name);
                 inline for (struct_info.fields) |field| {
                     if (std.mem.eql(u8, field.name, field_name)) {
-                        @field(r, field.name) = try innerParse(field.type, scanner, options);
+                        @field(r, field.name) = try innerParse(field.type, scanner, gpa, options);
                     }
                 }
             }

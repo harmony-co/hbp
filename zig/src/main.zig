@@ -42,90 +42,40 @@ const test_float = [_][]const u8{
 };
 
 pub fn main() !void {
-    var buf: [512]u8 = undefined;
+    var allocator: std.heap.GeneralPurposeAllocator(.{}) = .init;
+    const gpa = allocator.allocator();
+
     for (test_bool) |in| {
-        std.debug.print("-------------------------------------------------\n", .{});
-        std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(bool, in, .{})});
-        buf = undefined;
+        print(bool, gpa, in);
     }
     for (test_int) |in| {
-        std.debug.print("-------------------------------------------------\n", .{});
-        std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(i512, in, .{})});
-        buf = undefined;
+        print(i512, gpa, in);
     }
     for (test_uint) |in| {
-        std.debug.print("-------------------------------------------------\n", .{});
-        std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(u512, in, .{})});
-        buf = undefined;
+        print(u512, gpa, in);
     }
     for (test_float) |in| {
-        std.debug.print("-------------------------------------------------\n", .{});
-        std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in)});
-        std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(f128, in, .{ .float_behavior = .widen })});
-        buf = undefined;
+        print(f128, gpa, in);
     }
 
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in1 = comptime Serializer.serializeComptime(struct { u8, u16 }, .{ 36, 3204 });
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in1)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(struct { u8, u16 }, in1, .{})});
-    buf = undefined;
+    print(struct { u8, u16 }, gpa, comptime Serializer.serializeComptime(struct { u8, u16 }, .{ 36, 3204 }));
+    print(?u8, gpa, comptime Serializer.serializeComptime(?u8, 250));
+    print(?u8, gpa, comptime Serializer.serializeComptime(?u8, null));
+    print(enum { TEST }, gpa, comptime Serializer.serializeComptime(enum { TEST }, .TEST));
+    print([]const u8, gpa, comptime Serializer.serializeComptime([]const u8, "hello world"));
+    print(struct { x: u32 }, gpa, comptime Serializer.serializeComptime(struct { x: u32 }, .{ .x = 43545 }));
+    print(union(enum(u1)) { x: u32, y: []const u8 }, gpa, comptime Serializer.serializeComptime(union(enum(u1)) { x: u32, y: []const u8 }, .{ .x = 760589 }));
+    print(union(enum(u1)) { x: u32, y: []const u8 }, gpa, comptime Serializer.serializeComptime(union(enum(u1)) { x: u32, y: []const u8 }, .{ .y = "yo world" }));
+    print([]u8, gpa, comptime Serializer.serializeComptime([]u8, @constCast(@as([]const u8, &.{ 10, 60, 134 }))));
+    const t = struct { x: u32 };
+    print([]t, gpa, comptime Serializer.serializeComptime([]t, @constCast(@as([]const t, &.{ .{ .x = 10 }, .{ .x = 60 }, .{ .x = 134 } }))));
+}
 
+fn print(comptime T: type, gpa: std.mem.Allocator, payload: []const u8) void {
+    var buf: [512]u8 = undefined;
     std.debug.print("-------------------------------------------------\n", .{});
-    const in2 = comptime Serializer.serializeComptime(?u8, 250);
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in2)});
-    std.debug.print("Parsed Payload: {any}\n", .{try Deserializer.parseFromSlice(?u8, in2, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in3 = comptime Serializer.serializeComptime(?u8, null);
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in3)});
-    std.debug.print("Parsed Payload: {any}\n", .{try Deserializer.parseFromSlice(?u8, in3, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in4 = comptime Serializer.serializeComptime(u8, 246);
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in4)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in4, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in5 = comptime Serializer.serializeComptime(u8, 246);
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in5)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(?u8, in5, .{ .non_typed_optionals = .allow })});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in6 = comptime Serializer.serializeComptime(enum { TEST }, .TEST);
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in6)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(enum { TEST }, in6, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in7 = comptime Serializer.serializeComptime([]const u8, "hello world");
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in7)});
-    std.debug.print("Parsed Payload: {s}\n", .{try Deserializer.parseFromSlice([]const u8, in7, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in8 = comptime Serializer.serializeComptime(struct { x: u32 }, .{ .x = 43545 });
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in8)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(struct { x: u32 }, in8, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in9 = comptime Serializer.serializeComptime(union(enum(u1)) { x: u32, y: []const u8 }, .{ .x = 760589 });
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in9)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(union(enum(u1)) { x: u32, y: []const u8 }, in9, .{})});
-    buf = undefined;
-
-    std.debug.print("-------------------------------------------------\n", .{});
-    const in10 = comptime Serializer.serializeComptime(union(enum(u1)) { x: u32, y: []const u8 }, .{ .y = "yo world" });
-    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, in10)});
-    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(union(enum(u1)) { x: u32, y: []const u8 }, in10, .{})});
+    std.debug.print("HBP payload: {s}\n", .{readableOutput(&buf, payload)});
+    std.debug.print("Parsed Payload: {any}\n", .{Deserializer.parseFromSlice(T, payload, gpa, .{})});
     buf = undefined;
 }
 
