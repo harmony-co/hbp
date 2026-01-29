@@ -60,7 +60,7 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
                 .slice => {
                     if (pointer_info.is_const and pointer_info.child == u8) {
                         if (value.len <= 15) {
-                            try writer.writeByte(@intFromEnum(MarkerType.empty_string) + value.len);
+                            try writer.writeByte(@intFromEnum(MarkerType.empty_string) + @as(u8, @intCast(value.len)));
                         } else if (value.len <= std.math.maxInt(u8)) {
                             try writer.writeByte(@intFromEnum(MarkerType.arbitrary_string_1));
                             try writeInt(u8, @intCast(value.len), writer);
@@ -97,7 +97,7 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
                             },
                             else => {
                                 if (value.len <= 15) {
-                                    try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + value.len);
+                                    try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + @as(u8, @intCast(value.len)));
                                 } else if (value.len <= std.math.maxInt(u8)) {
                                     try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_1));
                                     try writeInt(u8, @intCast(value.len), writer);
