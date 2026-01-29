@@ -7,3 +7,4 @@ pub const innerParse = static.innerParse;
 
 pub const Scanner = @import("./Scanner.zig");
 pub const serialize = @import("./serializer.zig").serialize;
+pub const serializeFromValue = @import("./serializer.zig").serializeFromValue;

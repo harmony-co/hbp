@@ -16,6 +16,12 @@ pub fn serializeComptime(comptime T: type, value: T) []const u8 {
     }
 }
 
+pub fn serializeFromValue(gpa: std.mem.Allocator, value: anytype) ![]const u8 {
+    var w: std.Io.Writer.Allocating = .init(gpa);
+    try serialize(@TypeOf(value), value, &w.writer);
+    return try w.toOwnedSlice();
+}
+
 pub fn serialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
     // TODO: Use proper identifier
     try writer.writeByte(HBP_VERSION);
