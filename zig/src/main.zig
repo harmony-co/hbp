@@ -69,6 +69,7 @@ pub fn main() !void {
     print([]u8, gpa, comptime Serializer.serializeComptime([]u8, @constCast(@as([]const u8, &.{ 10, 60, 134 }))));
     const t = struct { x: u32 };
     print([]t, gpa, comptime Serializer.serializeComptime([]t, @constCast(@as([]const t, &.{ .{ .x = 10 }, .{ .x = 60 }, .{ .x = 134 } }))));
+    print(packed struct(u64) { t: bool, z: bool, _: u62 }, gpa, comptime Serializer.serializeComptime(packed struct(u64) { t: bool, z: bool, _: u62 = 0 }, .{ .t = false, .z = true }));
 }
 
 fn print(comptime T: type, gpa: std.mem.Allocator, payload: []const u8) void {

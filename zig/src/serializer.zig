@@ -142,7 +142,11 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
             } else @compileError("Unable to parse non tagged union '" ++ @typeName(T) ++ "'");
         },
         .@"struct" => |struct_info| {
-            if (struct_info.is_tuple) {
+            // Packed structs are encoded as their backing integer and treated as bitfields
+            // TODO: Maybe it could be a good idea to have a Meta type to indicate bitfields
+            if (struct_info.layout == .@"packed") {
+                try innerSerialize(struct_info.backing_integer.?, @bitCast(value), writer);
+            } else if (struct_info.is_tuple) {
                 if (struct_info.fields.len <= 15) {
                     try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + struct_info.fields.len);
                 } else if (struct_info.fields.len <= std.math.maxInt(u8)) {

@@ -199,6 +199,12 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, c
             }
         },
         .@"struct" => |struct_info| {
+            if (struct_info.layout == .@"packed") {
+                const token = try scanner.peekNextTokenType();
+                if (token != .int) return error.UnexpectedToken;
+                return @bitCast(try innerParse(struct_info.backing_integer.?, scanner, gpa, options));
+            }
+
             if (struct_info.is_tuple) {
                 const token = try scanner.next();
                 if (token != .tuple) return error.UnexpectedToken;
