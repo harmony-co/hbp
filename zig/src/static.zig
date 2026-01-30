@@ -4,15 +4,22 @@ const Scanner = @import("Scanner.zig");
 const assert = std.debug.assert;
 
 pub const ParseOptions = struct {
-    /// Allow parsing `i8` as `u8` and vice-versa
+    /// Wether arrays should be allowed to be partially filled.
+    ///
+    /// This only affects arrays with optionals meaning
+    /// `[50]?u8` can be `[30]u8 ++ [20]null`
+    ///
+    /// The default behavior (false) checks if the HBP payload has the exact same length as the array.
+    allow_empty_array_elements: bool = false,
+    /// Allow parsing `i8` as `u8` and vice-versa.
     ignore_integer_signedness: bool = false,
-    /// Use `std.enums.fromInt` instead of attempting to cast
+    /// Use `std.enums.fromInt` instead of attempting to cast.
     safe_enum_parsing: bool = false,
     float_behavior: enum(u1) {
         widen,
         preserve,
     } = .preserve,
-    /// Wether to try parsing types that do not start with `0xF0` (optional marker)
+    /// Wether to try parsing types that do not start with `0xF0` (optional marker).
     non_typed_optionals: enum(u1) {
         @"error",
         allow,
@@ -120,6 +127,28 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, c
 
             return error.InvalidUnion;
         },
+        .array => |array_info| {
+            switch (@typeInfo(array_info.child)) {
+                else => |t| {
+                    const token = try scanner.next();
+                    if (token != .tuple) return error.UnexpectedToken;
+
+                    if (array_info.len != token.tuple) {
+                        if (!options.allow_empty_array_elements)
+                            return error.InvalidArrayComponent
+                        else if (t != .optional)
+                            return error.PartialOptionalsOnly;
+                    }
+                    var arr: [array_info.len]array_info.child = if (t == .optional) @splat(null) else undefined;
+
+                    for (0..token.tuple) |i| {
+                        arr[i] = try innerParse(array_info.child, scanner, gpa, options);
+                    }
+
+                    return arr;
+                },
+            }
+        },
         .pointer => |pointer_info| {
             switch (pointer_info.size) {
                 .slice => {
@@ -163,7 +192,22 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, c
                         .float => {
                             const token = try scanner.next();
                             if (token != .vector) return error.UnexpectedToken;
-                            var arr: std.ArrayList(pointer_info.child) = .empty;
+
+                            const first = try scanner.next();
+                            if (first != .float) return error.UnexpectedToken;
+
+                            const element_byte_length = first.float.view.len;
+                            const N = alignIntegerType(pointer_info.child);
+                            var arr: std.ArrayList(N) = try .initCapacity(gpa, 1);
+
+                            try arr.append(gpa, sliceToInt(N, first.float.view));
+
+                            // The first element is already retrieved
+                            for (1..token.vector) |_| {
+                                const value_start = scanner.cursor;
+                                scanner.cursor += element_byte_length;
+                                try arr.append(gpa, sliceToInt(N, scanner.input[value_start..scanner.cursor]));
+                            }
                             return try arr.toOwnedSlice(gpa);
                         },
                         .bool => {

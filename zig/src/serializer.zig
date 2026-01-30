@@ -80,50 +80,14 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
 
                         try writer.writeAll(value);
                     } else {
-                        switch (@typeInfo(pointer_info.child)) {
-                            .int => |int| {
-                                try writeVectorMarker(value, writer);
-                                try writer.writeByte(getIntMarker(int));
-                                for (value) |val| {
-                                    try writeInt(std.math.ByteAlignedInt(pointer_info.child), val, writer);
-                                }
-                            },
-                            .float => |float| {
-                                try writeVectorMarker(value, writer);
-                                try writer.writeByte(getFloatMarker(float));
-                                for (value) |val| {
-                                    try writeFloat(std.math.ByteAlignedInt(pointer_info.child), val, writer);
-                                }
-                            },
-                            .bool => {
-                                try writeVectorMarker(value, writer);
-                                for (value) |val| {
-                                    try writer.writeByte(0x01 + @as(u8, @intFromBool(val)));
-                                }
-                            },
-                            else => {
-                                if (value.len <= 15) {
-                                    try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + @as(u8, @intCast(value.len)));
-                                } else if (value.len <= std.math.maxInt(u8)) {
-                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_1));
-                                    try writeInt(u8, @intCast(value.len), writer);
-                                } else if (value.len <= std.math.maxInt(u16)) {
-                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_2));
-                                    try writeInt(u16, @intCast(value.len), writer);
-                                } else if (value.len <= std.math.maxInt(u32)) {
-                                    try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_4));
-                                    try writeInt(u32, @intCast(value.len), writer);
-                                }
-
-                                for (value) |val| {
-                                    try innerSerialize(pointer_info.child, val, writer);
-                                }
-                            },
-                        }
+                        try parseArrayOrSlice(pointer_info.child, value, writer);
                     }
                 },
                 else => @compileError("Unsupported pointer type"),
             }
+        },
+        .array => |array_info| {
+            try parseArrayOrSlice(array_info.child, &value, writer);
         },
         .@"enum" => |enum_info| {
             std.debug.assert(@typeInfo(enum_info.tag_type).int.signedness == .unsigned);
@@ -182,6 +146,49 @@ fn innerSerialize(comptime T: type, value: T, writer: *std.Io.Writer) !void {
             }
         },
         else => @compileError("Unsupported type"),
+    }
+}
+
+fn parseArrayOrSlice(comptime T: type, value: []const T, writer: *std.Io.Writer) !void {
+    switch (@typeInfo(T)) {
+        .int => |int| {
+            try writeVectorMarker(value, writer);
+            try writer.writeByte(getIntMarker(int));
+            for (value) |val| {
+                try writeInt(std.math.ByteAlignedInt(T), val, writer);
+            }
+        },
+        .float => |float| {
+            try writeVectorMarker(value, writer);
+            try writer.writeByte(getFloatMarker(float));
+            for (value) |val| {
+                try writeFloat(std.math.ByteAlignedInt(T), val, writer);
+            }
+        },
+        .bool => {
+            try writeVectorMarker(value, writer);
+            for (value) |val| {
+                try writer.writeByte(0x01 + @as(u8, @intFromBool(val)));
+            }
+        },
+        else => {
+            if (value.len <= 15) {
+                try writer.writeByte(@intFromEnum(MarkerType.empty_tuple) + @as(u8, @intCast(value.len)));
+            } else if (value.len <= std.math.maxInt(u8)) {
+                try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_1));
+                try writeInt(u8, @intCast(value.len), writer);
+            } else if (value.len <= std.math.maxInt(u16)) {
+                try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_2));
+                try writeInt(u16, @intCast(value.len), writer);
+            } else if (value.len <= std.math.maxInt(u32)) {
+                try writer.writeByte(@intFromEnum(MarkerType.arbitrary_tuple_4));
+                try writeInt(u32, @intCast(value.len), writer);
+            }
+
+            for (value) |val| {
+                try innerSerialize(T, val, writer);
+            }
+        },
     }
 }
 
