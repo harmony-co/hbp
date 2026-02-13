@@ -20,7 +20,7 @@ pub fn deinit(self: *Scanner) void {
 
 pub fn peekNextTokenType(self: *Scanner) !TokenType {
     switch (self.state) {
-        .marker => {
+        .marker, .post_value => {
             const m = std.enums.fromInt(MarkerType, self.input[self.cursor]) orelse return error.UnknownMarker;
             return switch (m) {
                 .null => .null,
@@ -53,6 +53,26 @@ pub fn peekNextTokenType(self: *Scanner) !TokenType {
                 // .octuple_float,
                 // .brain_float,
                 => .float,
+                .empty_string,
+                .string_1,
+                .string_2,
+                .string_3,
+                .string_4,
+                .string_5,
+                .string_6,
+                .string_7,
+                .string_8,
+                .string_9,
+                .string_10,
+                .string_11,
+                .string_12,
+                .string_13,
+                .string_14,
+                .string_15,
+                .arbitrary_string_1,
+                .arbitrary_string_2,
+                .arbitrary_string_4,
+                => .string,
                 .empty_tuple,
                 .tuple_1,
                 .tuple_2,
@@ -73,7 +93,33 @@ pub fn peekNextTokenType(self: *Scanner) !TokenType {
                 .arbitrary_tuple_2,
                 .arbitrary_tuple_4,
                 => .tuple,
+                .empty_vector,
+                .vector_1,
+                .vector_2,
+                .vector_3,
+                .vector_4,
+                .vector_5,
+                .vector_6,
+                .vector_7,
+                .vector_8,
+                .vector_9,
+                .vector_10,
+                .vector_11,
+                .vector_12,
+                .vector_13,
+                .vector_14,
+                .vector_15,
+                .arbitrary_vector_1,
+                .arbitrary_vector_2,
+                .arbitrary_vector_4,
+                => .vector,
+                .arbitrary_dict_1,
+                .arbitrary_dict_2,
+                .arbitrary_dict_4,
+                => .@"struct",
                 .optional => .optional,
+                .@"enum" => .@"enum",
+                .@"union" => .@"union",
                 else => error.NotImplemented,
             };
         },
@@ -91,6 +137,10 @@ pub fn next(self: *Scanner) !Token {
         .marker => {
             const m = std.enums.fromInt(MarkerType, self.input[self.cursor]) orelse return error.UnknownMarker;
             switch (m) {
+                .optional => {
+                    self.cursor += 1;
+                    return .optional;
+                },
                 .null => {
                     self.cursor += 1;
                     self.state = .post_value;
@@ -167,6 +217,47 @@ pub fn next(self: *Scanner) !Token {
                 },
                 // .octuple_float,
                 // .brain_float,
+                .empty_string,
+                .string_1,
+                .string_2,
+                .string_3,
+                .string_4,
+                .string_5,
+                .string_6,
+                .string_7,
+                .string_8,
+                .string_9,
+                .string_10,
+                .string_11,
+                .string_12,
+                .string_13,
+                .string_14,
+                .string_15,
+                => {
+                    const byte_length = self.input[self.cursor] - 0x60;
+                    self.cursor += 1;
+                    return self.parseStringState(byte_length);
+                },
+                // TODO: The spec for arbitrary strings is a bit more complex than this
+                // But since its not yet documented we aren't implementing it fully
+                .arbitrary_string_1 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
+                    self.cursor += 1;
+                    return self.parseStringState(byte_length);
+                },
+                .arbitrary_string_2 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    self.cursor += 2;
+                    return self.parseStringState(byte_length);
+                },
+                .arbitrary_string_4 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    self.cursor += 4;
+                    return self.parseStringState(byte_length);
+                },
                 .empty_tuple,
                 .tuple_1,
                 .tuple_2,
@@ -190,27 +281,80 @@ pub fn next(self: *Scanner) !Token {
                 },
                 .arbitrary_tuple_1 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u8, self.input[self.cursor]);
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
                     self.cursor += 1;
                     return self.parseTupleState(byte_length);
                 },
                 .arbitrary_tuple_2 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
                     self.cursor += 2;
                     return self.parseTupleState(byte_length);
                 },
                 .arbitrary_tuple_4 => {
                     self.cursor += 1;
-                    const byte_length = std.mem.nativeToBig(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
                     self.cursor += 4;
                     return self.parseTupleState(byte_length);
                 },
-                .optional => {
+                .empty_vector,
+                .vector_1,
+                .vector_2,
+                .vector_3,
+                .vector_4,
+                .vector_5,
+                .vector_6,
+                .vector_7,
+                .vector_8,
+                .vector_9,
+                .vector_10,
+                .vector_11,
+                .vector_12,
+                .vector_13,
+                .vector_14,
+                .vector_15,
+                => {
+                    const byte_length = self.input[self.cursor] - 0x80;
                     self.cursor += 1;
-                    self.state = .marker;
-                    return .optional;
+                    return self.parseVectorState(byte_length);
                 },
+                .arbitrary_vector_1 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
+                    self.cursor += 1;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_vector_2 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    self.cursor += 2;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_vector_4 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    self.cursor += 4;
+                    return self.parseVectorState(byte_length);
+                },
+                .arbitrary_dict_1 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u8, self.input[self.cursor]);
+                    self.cursor += 1;
+                    return self.parseStructState(byte_length);
+                },
+                .arbitrary_dict_2 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+                    self.cursor += 2;
+                    return self.parseStructState(byte_length);
+                },
+                .arbitrary_dict_4 => {
+                    self.cursor += 1;
+                    const byte_length = std.mem.nativeToLittle(u32, std.mem.bytesToValue(u32, self.input[self.cursor .. self.cursor + 4]));
+                    self.cursor += 4;
+                    return self.parseStructState(byte_length);
+                },
+                //? TODO?: Could be worth optimizing u1 enums in the sense of booleans, this has to be discussed further
                 // NOTE: Maybe it could be worth to allow enums to omit the type marker for `u8` enums
                 .@"enum" => {
                     self.cursor += 1;
@@ -222,6 +366,10 @@ pub fn next(self: *Scanner) !Token {
                     }
 
                     return .@"enum";
+                },
+                .@"union" => {
+                    self.cursor += 1;
+                    return .@"union";
                 },
                 else => return error.NotImplemented,
             }
@@ -243,7 +391,7 @@ pub fn next(self: *Scanner) !Token {
             };
         },
         .arbitrary_int, .arbitrary_uint => {
-            const byte_length = std.mem.nativeToBig(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
+            const byte_length = std.mem.nativeToLittle(u16, std.mem.bytesToValue(u16, self.input[self.cursor .. self.cursor + 2]));
             self.cursor += 2;
             const value_start = self.cursor;
             self.cursor += byte_length;
@@ -279,9 +427,24 @@ fn checkEnd(self: *Scanner) bool {
     return self.cursor >= self.input.len;
 }
 
+fn parseStringState(self: *Scanner, byte_length: u32) Token {
+    self.state = if (byte_length == 0) .post_value else .marker;
+    return .{ .string = byte_length };
+}
+
 fn parseTupleState(self: *Scanner, byte_length: u32) Token {
     self.state = if (byte_length == 0) .post_value else .marker;
     return .{ .tuple = byte_length };
+}
+
+fn parseVectorState(self: *Scanner, elements: u32) Token {
+    self.state = if (elements == 0) .post_value else .marker;
+    return .{ .vector = elements };
+}
+
+fn parseStructState(self: *Scanner, kv_pairs: u32) Token {
+    self.state = if (kv_pairs == 0) .post_value else .marker;
+    return .{ .@"struct" = kv_pairs };
 }
 
 pub const MarkerType = enum(u8) {
@@ -316,6 +479,25 @@ pub const MarkerType = enum(u8) {
     decimal_32 = 0x3A,
     decimal_64 = 0x3B,
     decimal_128 = 0x3C,
+    empty_string = 0x60,
+    string_1 = 0x61,
+    string_2 = 0x62,
+    string_3 = 0x63,
+    string_4 = 0x64,
+    string_5 = 0x65,
+    string_6 = 0x66,
+    string_7 = 0x67,
+    string_8 = 0x68,
+    string_9 = 0x69,
+    string_10 = 0x6A,
+    string_11 = 0x6B,
+    string_12 = 0x6C,
+    string_13 = 0x6D,
+    string_14 = 0x6E,
+    string_15 = 0x6F,
+    arbitrary_string_1 = 0xC0,
+    arbitrary_string_2 = 0xC1,
+    arbitrary_string_4 = 0xC2,
     empty_tuple = 0x70,
     tuple_1 = 0x71,
     tuple_2 = 0x72,
@@ -361,6 +543,7 @@ pub const MarkerType = enum(u8) {
     arbitrary_dict_4 = 0xD2,
     optional = 0xE0,
     @"enum" = 0xE1,
+    @"union" = 0xE2,
     @"error" = 0xFF,
 };
 
@@ -381,9 +564,13 @@ pub const TokenType = enum {
     true,
     int,
     float,
+    string,
     tuple,
+    vector,
+    @"struct",
     optional,
     @"enum",
+    @"union",
     eos,
 };
 
@@ -400,9 +587,13 @@ pub const Token = union(TokenType) {
         bits: u16,
         view: []const u8,
     },
+    string: u32,
     tuple: u32,
+    vector: u32,
+    @"struct": u32,
     optional,
     @"enum",
+    @"union",
     eos,
 };
 

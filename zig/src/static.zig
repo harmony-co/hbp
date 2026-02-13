@@ -4,37 +4,53 @@ const Scanner = @import("Scanner.zig");
 const assert = std.debug.assert;
 
 pub const ParseOptions = struct {
-    /// Allow parsing `i8` as `u8` and vice-versa
+    /// Wether arrays should be allowed to be partially filled.
+    ///
+    /// This only affects arrays with optionals meaning
+    /// `[50]?u8` can be `[30]u8 ++ [20]null`
+    ///
+    /// The default behavior (false) checks if the HBP payload has the exact same length as the array.
+    allow_empty_array_elements: bool = false,
+    /// Allow parsing `i8` as `u8` and vice-versa.
     ignore_integer_signedness: bool = false,
-    /// Use `std.enums.fromInt` instead of attempting to cast
+    /// Use `std.enums.fromInt` instead of attempting to cast.
     safe_enum_parsing: bool = false,
     float_behavior: enum(u1) {
         widen,
         preserve,
     } = .preserve,
-    /// Wether to try parsing types that do not start with `0xF0` (optional marker)
+    /// Wether to try parsing types that do not start with `0xF0` (optional marker).
     non_typed_optionals: enum(u1) {
         @"error",
         allow,
     } = .@"error",
 };
 
-pub fn parseFromSlice(comptime T: type, slice: []const u8, comptime options: ParseOptions) !T {
+fn ParseOutputType(comptime T: type) type {
+    return switch (@typeInfo(T)) {
+        .int => alignIntegerType(T),
+        else => T,
+    };
+}
+
+pub fn parseFromSlice(comptime T: type, slice: []const u8, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     var scanner: Scanner = .init(slice);
     defer scanner.deinit();
 
-    return parseFromTokenSource(T, &scanner, options);
+    return parseFromTokenSource(T, &scanner, gpa, options);
 }
 
-pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
+pub fn parseFromTokenSource(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     assert(try scanner.next() == .identifier);
-    const value = try innerParse(T, scanner, options);
+    const value = try innerParse(T, scanner, gpa, options);
     assert(try scanner.next() == .eos);
     return value;
 }
 
-pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOptions) !T {
+/// Allocator is only used for dynamic slices and strings
+pub fn innerParse(comptime T: type, scanner: *Scanner, gpa: std.mem.Allocator, comptime options: ParseOptions) !ParseOutputType(T) {
     switch (@typeInfo(T)) {
+        .void => return,
         .null => {
             return switch (try scanner.next()) {
                 .null => null,
@@ -83,36 +99,186 @@ pub fn innerParse(comptime T: type, scanner: *Scanner, comptime options: ParseOp
                         return null;
                     }
 
-                    return try innerParse(optional.child, scanner, options);
+                    return try innerParse(optional.child, scanner, gpa, options);
                 },
-                else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, options) else error.UnexpectedToken,
+                else => return if (comptime options.non_typed_optionals == .allow) try innerParse(optional.child, scanner, gpa, options) else error.UnexpectedToken,
             }
         },
-        .@"enum" => |enumInfo| {
+        .@"enum" => |enum_info| {
             if (try scanner.next() != .@"enum") return error.UnexpectedToken;
             const token = try scanner.next();
             if (token != .int) return error.UnexpectedToken;
 
             if (comptime options.safe_enum_parsing) {
-                return std.enums.fromInt(T, sliceToInt(enumInfo.tag_type, token.int.view)) orelse error.InvalidEnumTag;
+                return std.enums.fromInt(T, sliceToInt(enum_info.tag_type, token.int.view)) orelse error.InvalidEnumTag;
             } else {
-                return @enumFromInt(sliceToInt(enumInfo.tag_type, token.int.view));
+                return @enumFromInt(sliceToInt(enum_info.tag_type, token.int.view));
             }
         },
-        .@"struct" => |structInfo| {
-            if (structInfo.is_tuple) {
+        .@"union" => |union_info| {
+            if (union_info.tag_type) |tag_type| {
+                const token = try scanner.next();
+                if (token != .@"union") return error.UnexpectedToken;
+                const union_tag = try innerParse(@typeInfo(tag_type).@"enum".tag_type, scanner, gpa, options);
+                inline for (union_info.fields) |field| {
+                    if (std.mem.eql(u8, field.name, @tagName(@as(tag_type, @enumFromInt(union_tag))))) return @unionInit(T, field.name, try innerParse(field.type, scanner, gpa, options));
+                }
+            } else @compileError("Unable to parse into untagged union '" ++ @typeName(T) ++ "'");
+
+            return error.InvalidUnion;
+        },
+        .array => |array_info| {
+            switch (@typeInfo(array_info.child)) {
+                else => |t| {
+                    const token = try scanner.next();
+                    if (token != .tuple) return error.UnexpectedToken;
+
+                    if (array_info.len != token.tuple) {
+                        if (!options.allow_empty_array_elements)
+                            return error.InvalidArrayComponent
+                        else if (t != .optional)
+                            return error.PartialOptionalsOnly;
+                    }
+                    var arr: [array_info.len]array_info.child = if (t == .optional) @splat(null) else undefined;
+
+                    for (0..token.tuple) |i| {
+                        arr[i] = try innerParse(array_info.child, scanner, gpa, options);
+                    }
+
+                    return arr;
+                },
+            }
+        },
+        .pointer => |pointer_info| {
+            switch (pointer_info.size) {
+                .slice => {
+                    if (pointer_info.is_const and pointer_info.child == u8) {
+                        const token = try scanner.next();
+                        if (token != .string) return error.UnexpectedToken;
+
+                        const str = try gpa.dupe(u8, scanner.input[scanner.cursor .. scanner.cursor + token.string]);
+                        scanner.cursor += token.string;
+                        scanner.state = .post_value;
+                        return str;
+                    }
+
+                    switch (@typeInfo(pointer_info.child)) {
+                        .int => |int| {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+
+                            const first = try scanner.next();
+                            if (first != .int) return error.UnexpectedToken;
+
+                            if (comptime !options.ignore_integer_signedness) {
+                                if (first.int.signedness != int.signedness) return error.WrongIntegerType;
+                            }
+
+                            const element_byte_length = first.int.view.len;
+                            const N = alignIntegerType(pointer_info.child);
+                            var arr: std.ArrayList(N) = try .initCapacity(gpa, 1);
+
+                            try arr.append(gpa, sliceToInt(N, first.int.view));
+
+                            // The first element is already retrieved
+                            for (1..token.vector) |_| {
+                                const value_start = scanner.cursor;
+                                scanner.cursor += element_byte_length;
+                                try arr.append(gpa, sliceToInt(N, scanner.input[value_start..scanner.cursor]));
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        .float => {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+
+                            const first = try scanner.next();
+                            if (first != .float) return error.UnexpectedToken;
+
+                            const element_byte_length = first.float.view.len;
+                            const N = alignIntegerType(pointer_info.child);
+                            var arr: std.ArrayList(N) = try .initCapacity(gpa, 1);
+
+                            try arr.append(gpa, sliceToInt(N, first.float.view));
+
+                            // The first element is already retrieved
+                            for (1..token.vector) |_| {
+                                const value_start = scanner.cursor;
+                                scanner.cursor += element_byte_length;
+                                try arr.append(gpa, sliceToInt(N, scanner.input[value_start..scanner.cursor]));
+                            }
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        .bool => {
+                            const token = try scanner.next();
+                            if (token != .vector) return error.UnexpectedToken;
+                            var arr: std.ArrayList(bool) = .empty;
+
+                            for (0..token.tuple) |_| {
+                                const b = try scanner.next();
+                                if (b != .bool) return error.UnexpectedToken;
+                                try arr.append(gpa, switch (b.bool) {
+                                    .false => false,
+                                    .true => true,
+                                });
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                        else => {
+                            const token = try scanner.next();
+                            if (token != .tuple) return error.UnexpectedToken;
+                            var arr: std.ArrayList(pointer_info.child) = .empty;
+
+                            for (0..token.tuple) |_| {
+                                try arr.append(gpa, try innerParse(pointer_info.child, scanner, gpa, options));
+                            }
+
+                            return try arr.toOwnedSlice(gpa);
+                        },
+                    }
+                },
+                else => @compileError("Unsupported pointer type"),
+            }
+        },
+        .@"struct" => |struct_info| {
+            if (struct_info.layout == .@"packed") {
+                const token = try scanner.peekNextTokenType();
+                if (token != .int) return error.UnexpectedToken;
+                return @bitCast(try innerParse(struct_info.backing_integer.?, scanner, gpa, options));
+            }
+
+            if (struct_info.is_tuple) {
                 const token = try scanner.next();
                 if (token != .tuple) return error.UnexpectedToken;
-                assert(structInfo.fields.len == token.tuple);
+                assert(struct_info.fields.len == token.tuple);
 
                 var r: T = undefined;
 
-                inline for (structInfo.fields, 0..) |field, i| {
-                    r[i] = try innerParse(field.type, scanner, options);
+                inline for (struct_info.fields, 0..) |field, i| {
+                    r[i] = try innerParse(field.type, scanner, gpa, options);
                 }
 
                 return r;
             }
+
+            const token = try scanner.next();
+            if (token != .@"struct") return error.UnexpectedToken;
+            assert(struct_info.fields.len == token.@"struct");
+            var r: T = undefined;
+
+            for (0..token.@"struct") |_| {
+                const field_name = try innerParse([]const u8, scanner, gpa, options);
+                defer gpa.free(field_name);
+                inline for (struct_info.fields) |field| {
+                    if (std.mem.eql(u8, field.name, field_name)) {
+                        @field(r, field.name) = try innerParse(field.type, scanner, gpa, options);
+                    }
+                }
+            }
+
+            return r;
         },
         .comptime_int, .comptime_float => error.IncompatibleTypes,
         else => return error.TODO,
@@ -133,10 +299,10 @@ fn sliceToInt(comptime T: type, slice: []const u8) alignIntegerType(T) {
 
     if (slice.len < byte_length) {
         var buf = std.mem.zeroes([byte_length]u8);
-        @memcpy(buf[byte_length - slice.len ..], slice);
-        return std.mem.readInt(N, &buf, .big);
+        @memcpy(buf[0..slice.len], slice);
+        return std.mem.readInt(N, &buf, .little);
     }
 
     assert(slice.len == byte_length);
-    return std.mem.readInt(N, slice[0..byte_length], .big);
+    return std.mem.readInt(N, slice[0..byte_length], .little);
 }

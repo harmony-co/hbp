@@ -146,6 +146,12 @@ Marker: `E1`
 
 The enum marker must **always** be followed by an integer marker to indicate the maximum size of the enum, the data should follow the same encoding as the indicated type.
 
+## Union
+
+Marker: `E2`
+
+The union marker is **always** followed by an integer marker indicating the active tag followed by the union data.
+
 ## Error
 
 Marker: `FF`
@@ -159,6 +165,42 @@ Serialized: 01 FF 6B 54 68 69 73 20 46 61 69 6C 65 64
 ```
 
 # Composite Data Types
+
+## Strings
+
+Strings are `UTF-8` encoded arrays of bytes.
+
+> Why aren't strings a meta type on top of Vector? There was a long discussion about this that i need to append here. . .
+
+Small strings:
+
+| Marker | String size |
+| :----: | :---------: |
+|  `60`  |      0      |
+|  `61`  |      1      |
+|  `62`  |      2      |
+|  `63`  |      3      |
+|  `64`  |      4      |
+|  `65`  |      5      |
+|  `66`  |      6      |
+|  `67`  |      7      |
+|  `68`  |      8      |
+|  `69`  |      9      |
+|  `6A`  |     10      |
+|  `6B`  |     11      |
+|  `6C`  |     12      |
+|  `6D`  |     13      |
+|  `6E`  |     14      |
+|  `6F`  |     15      |
+
+Long Strings:
+
+| Marker | Extra bytes | Maximum Size  |
+| :----: | :---------: | :-----------: |
+|  `C0`  |      1      |      255      |
+|  `C1`  |      2      |    65_535     |
+|  `C2`  |      4      | 4_294_967_295 |
+
 
 ## Tuple
 
