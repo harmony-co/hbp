@@ -216,6 +216,39 @@ function getResult(state: BufferWriterState): Uint8Array {
 
 const textEncoder = new TextEncoder();
 
+function writeLength(
+    state: BufferWriterState,
+    marker: Marker,
+    length: number
+): void {
+    // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check
+    switch (marker) {
+        case Marker.string_utf8_255:
+        case Marker.tuple_255:
+        case Marker.vector_255:
+        case Marker.dict_255:
+        case Marker.map_255:
+            writeUint8(state, length);
+            break;
+
+        case Marker.string_utf8_65535:
+        case Marker.tuple_65535:
+        case Marker.vector_65535:
+        case Marker.dict_65535:
+        case Marker.map_65535:
+            writeUint16(state, length);
+            break;
+
+        case Marker.string_utf8_4G:
+        case Marker.tuple_4G:
+        case Marker.vector_4G:
+        case Marker.dict_4G:
+        case Marker.map_4G:
+            writeUint32(state, length);
+            break;
+    }
+}
+
 function writeExplicit(
     state: BufferWriterState,
     data: string | number | bigint | boolean | object | undefined | null,
@@ -248,89 +281,49 @@ function writeExplicit(
         case Marker.float_single: writeFloat32(state, Number(data)); return;
         case Marker.float_double: writeFloat64(state, Number(data)); return;
         default:
-            if (marker >= Marker.string_utf8_0 && marker <= Marker.string_utf8_15) {
+            if (
+                (marker >= Marker.string_utf8_0 && marker <= Marker.string_utf8_15)
+                || marker === Marker.string_utf8_255
+                || marker === Marker.string_utf8_65535
+                || marker === Marker.string_utf8_4G
+            ) {
                 const bytes = textEncoder.encode(String(data as string));
+                writeLength(state, marker, bytes.length);
                 writeBuffer(state, bytes);
                 return;
             }
 
-            if (marker === Marker.string_utf8_255) {
-                const bytes = textEncoder.encode(String(data as string));
-                writeUint8(state, bytes.length);
-                writeBuffer(state, bytes);
-                return;
-            }
-
-            if (marker === Marker.string_utf8_65535) {
-                const bytes = textEncoder.encode(String(data as string));
-                writeUint16(state, bytes.length);
-                writeBuffer(state, bytes);
-                return;
-            }
-
-            if (marker === Marker.string_utf8_4G) {
-                const bytes = textEncoder.encode(String(data as string));
-                writeUint32(state, bytes.length);
-                writeBuffer(state, bytes);
-                return;
-            }
-
-            if (marker >= Marker.tuple_0 && marker <= Marker.tuple_15) {
+            if (
+                (marker >= Marker.tuple_0 && marker <= Marker.tuple_15)
+                || marker === Marker.tuple_255
+                || marker === Marker.tuple_65535
+                || marker === Marker.tuple_4G
+            ) {
                 const arr = data as Array<any>;
+                writeLength(state, marker, arr.length);
                 for (const item of arr) writeAny(state, item);
                 return;
             }
 
-            if (marker === Marker.tuple_255) {
-                const arr = data as Array<any>;
-                writeUint8(state, arr.length);
-                for (const item of arr) writeAny(state, item);
-                return;
-            }
-
-            if (marker === Marker.tuple_65535) {
-                const arr = data as Array<any>;
-                writeUint16(state, arr.length);
-                for (const item of arr) writeAny(state, item);
-                return;
-            }
-
-            if (marker === Marker.tuple_4G) {
-                const arr = data as Array<any>;
-                writeUint32(state, arr.length);
-                for (const item of arr) writeAny(state, item);
-                return;
-            }
-
-            if (marker >= Marker.vector_0 && marker <= Marker.vector_15) {
-                writeVectorData(state, data as ArrayBufferView);
-                return;
-            }
-
-            if (marker === Marker.vector_255) {
+            if (
+                (marker >= Marker.vector_0 && marker <= Marker.vector_15)
+                || marker === Marker.vector_255
+                || marker === Marker.vector_65535
+                || marker === Marker.vector_4G
+            ) {
                 const view = data as ArrayBufferView;
-                writeUint8(state, view.byteLength);
+                writeLength(state, marker, view.byteLength);
                 writeVectorData(state, view);
                 return;
             }
 
-            if (marker === Marker.vector_65535) {
-                const view = data as ArrayBufferView;
-                writeUint16(state, view.byteLength);
-                writeVectorData(state, view);
-                return;
-            }
-
-            if (marker === Marker.vector_4G) {
-                const view = data as ArrayBufferView;
-                writeUint32(state, view.byteLength);
-                writeVectorData(state, view);
-                return;
-            }
-
-            if (marker === Marker.dict_255) {
+            if (
+                marker === Marker.dict_255
+                || marker === Marker.dict_65535
+                || marker === Marker.dict_4G
+            ) {
                 const entries = Object.entries(data as object);
-                writeUint8(state, entries.length);
+                writeLength(state, marker, entries.length);
                 for (const [k, v] of entries) {
                     writeString(state, k);
                     writeAny(state, v);
@@ -338,49 +331,13 @@ function writeExplicit(
                 return;
             }
 
-            if (marker === Marker.dict_65535) {
-                const entries = Object.entries(data as object);
-                writeUint16(state, entries.length);
-                for (const [k, v] of entries) {
-                    writeString(state, k);
-                    writeAny(state, v);
-                }
-                return;
-            }
-
-            if (marker === Marker.dict_4G) {
-                const entries = Object.entries(data as object);
-                writeUint32(state, entries.length);
-                for (const [k, v] of entries) {
-                    writeString(state, k);
-                    writeAny(state, v);
-                }
-                return;
-            }
-
-            if (marker === Marker.map_255) {
+            if (
+                marker === Marker.map_255
+                || marker === Marker.map_65535
+                || marker === Marker.map_4G
+            ) {
                 const map = data as Map<any, any>;
-                writeUint8(state, map.size);
-                for (const [k, v] of map) {
-                    writeAny(state, k);
-                    writeAny(state, v);
-                }
-                return;
-            }
-
-            if (marker === Marker.map_65535) {
-                const map = data as Map<any, any>;
-                writeUint16(state, map.size);
-                for (const [k, v] of map) {
-                    writeAny(state, k);
-                    writeAny(state, v);
-                }
-                return;
-            }
-
-            if (marker === Marker.map_4G) {
-                const map = data as Map<any, any>;
-                writeUint32(state, map.size);
+                writeLength(state, marker, map.size);
                 for (const [k, v] of map) {
                     writeAny(state, k);
                     writeAny(state, v);
@@ -471,16 +428,16 @@ function writeNumber(state: BufferWriterState, num: number): void {
 
 function writeBigIntAuto(state: BufferWriterState, num: bigint): void {
     if (num < 0n) {
-        if (num >= -128n) {
+        if (num >= -(1n << 7n)) {
             writeUint8(state, Marker.signed_int_8);
             writeInt8(state, Number(num));
-        } else if (num >= -32768n) {
+        } else if (num >= -(1n << 15n)) {
             writeUint8(state, Marker.signed_int_16);
             writeInt16(state, Number(num));
-        } else if (num >= -2147483648n) {
+        } else if (num >= -(1n << 31n)) {
             writeUint8(state, Marker.signed_int_32);
             writeInt32(state, Number(num));
-        } else if (num >= -9223372036854775808n) {
+        } else if (num >= -(1n << 63n)) {
             writeUint8(state, Marker.signed_int_64);
             writeBigInt64(state, num);
         } else if (num >= -(1n << 127n)) {
@@ -498,16 +455,16 @@ function writeBigIntAuto(state: BufferWriterState, num: bigint): void {
         }
     } else {
         // eslint-disable-next-line no-lonely-if
-        if (num <= 255n) {
+        if (num < (1n << 8n)) {
             writeUint8(state, Marker.unsigned_int_8);
             writeUint8(state, Number(num));
-        } else if (num <= 65535n) {
+        } else if (num < (1n << 16n)) {
             writeUint8(state, Marker.unsigned_int_16);
             writeUint16(state, Number(num));
-        } else if (num <= 4294967295n) {
+        } else if (num < (1n << 32n)) {
             writeUint8(state, Marker.unsigned_int_32);
             writeUint32(state, Number(num));
-        } else if (num <= 18446744073709551615n) {
+        } else if (num < (1n << 64n)) {
             writeUint8(state, Marker.unsigned_int_64);
             writeBigUint64(state, num);
         } else if (num < (1n << 128n)) {
