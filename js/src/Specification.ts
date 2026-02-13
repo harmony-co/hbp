@@ -149,6 +149,7 @@ export const enum Marker {
     /// Meta Data Types
     optional = 0xE0,
     enum = 0xE1,
+    union = 0xE2,
     error = 0xFF
 
     /* eslint-enable @typescript-eslint/naming-convention */
@@ -334,10 +335,12 @@ export const LongTupleExtraByte = {
 type LongTupleExtraBytes = typeof LongTupleExtraByte;
 
 type SmallTupleSpec = {
+    // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
     [K in keyof SmallTupleCapacities]: [K, ...FixedLengthBuffer<PrimitiveMarkerSpecs, SmallTupleCapacities[K]>];
 }[keyof SmallTupleCapacities];
 
 type LongTupleSpec = {
+    // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
     [K in keyof LongTupleExtraBytes]: [K, ...FixedLengthBuffer<Byte, LongTupleExtraBytes[K]>, ...Array<PrimitiveMarkerSpecs>];
 }[keyof LongTupleExtraBytes];
 
@@ -380,12 +383,14 @@ type LongVectorExtraBytes = typeof LongVectorExtraByte;
 
 type SmallVectorSpec = {
     [K in keyof SmallVectorCapacities]: {
+        // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
         [M in PrimitiveMarker]: [K, M, ...Flatten<FixedLengthBuffer<Tail<M, PrimitiveMarkerSpecs>, SmallVectorCapacities[K]>>]
     }[PrimitiveMarker];
 }[keyof SmallVectorCapacities];
 
 type LongVectorSpec = {
     [K in keyof LongVectorExtraBytes]: {
+        // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
         [M in PrimitiveMarker]: [K, M, ...FixedLengthBuffer<Byte, LongVectorExtraBytes[K]>, ...Tail<M, PrimitiveMarkerSpecs>]
     }[PrimitiveMarker];
 }[keyof LongVectorExtraBytes];
@@ -408,6 +413,7 @@ type DictExtraBytes = typeof DictExtraByte;
 
 type DictSpec = {
     [K in keyof DictExtraBytes]: [K, ...FixedLengthBuffer<Byte, DictExtraBytes[K]>,
+        // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
         ...Flatten<[UTF8StringSpec, PrimitiveMarkerSpecs]>
     ];
 }[keyof DictExtraBytes];
@@ -426,6 +432,7 @@ type MapExtraBytes = typeof MapExtraByte;
 
 type MapSpec = {
     [K in keyof MapExtraBytes]: [K, ...FixedLengthBuffer<Byte, MapExtraBytes[K]>,
+        // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
         ...Flatten<[Exclude<
             PrimitiveMarkerSpecs,
             | NullSpec
@@ -496,6 +503,7 @@ export type MetaMarker = Extract<
 /// Optional
 type OptionalSpec = [
     Marker.optional,
+    // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
     ...PrimitiveMarkerSpecs
 ];
 
@@ -503,6 +511,14 @@ type OptionalSpec = [
 type EnumSpec = [
     Marker.enum,
     ...UnsignedIntFixedSpecs
+];
+
+/// Union
+type UnionSpec = [
+    Marker.union,
+    ...UnsignedIntFixedSpecs,
+    // ! `PrimitiveMarkerSpecs` is used to avoid recursive types
+    ...PrimitiveMarkerSpecs
 ];
 
 /// Error
@@ -534,6 +550,7 @@ export type MarkerSpecs =
     | DictSpec
     | MapSpec
     | EnumSpec
+    | UnionSpec
     | StringSpec
     | ErrorSpec
     | OptionalSpec;
