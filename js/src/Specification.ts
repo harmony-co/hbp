@@ -180,6 +180,8 @@ type FixedLengthBuffer<T, L extends number> =
 
 export type Tail<M extends number, T extends Array<unknown>> = T extends [M, ...infer R] ? R : never;
 
+export type IsUnion<T, U = T> = T extends any ? ([U] extends [T] ? false : true) : never;
+
 /** @see https://stackoverflow.com/a/59833759/28282697 */
 type Flatten<
     T extends ReadonlyArray<unknown>,

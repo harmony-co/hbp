@@ -1,4 +1,18 @@
-import type { BooleanMarker, DecimalMarker, DictMarker, FloatMarker, HBPFrame, MapMarker, NullMarker, Tail, TupleMarker, UTF8StringMarker, VectorMarker, PrimitiveMarker } from "./Specification.js";
+import type {
+    BooleanMarker,
+    DecimalMarker,
+    DictMarker,
+    FloatMarker,
+    HBPFrame,
+    MapMarker,
+    NullMarker,
+    Tail,
+    TupleMarker,
+    UTF8StringMarker,
+    VectorMarker,
+    PrimitiveMarker,
+    IsUnion
+} from "./Specification.js";
 import { HBPVersion, Marker } from "./Specification.js";
 
 type BufferWriterState = {
@@ -71,14 +85,16 @@ export type MarkerToType<M extends Marker> =
         | Float64Array :
     M extends DictMarker ? Record<string, HBPValue> :
     M extends MapMarker ? Map<HBPMapKey, HBPValue> :
-    M extends Marker.error ? Error :
-    M extends Marker.optional ? HBPValue :
+    M extends Marker.optional ? HBPValue | null :
     M extends Marker.enum ? number | bigint :
+    M extends Marker.union ? HBPValue :
+    M extends Marker.error ? Error :
     never;
 /* eslint-enable @stylistic/indent */
 
 /* eslint-disable @stylistic/indent */
 export type InferHBPType<T> =
+    IsUnion<T> extends true ? Marker.union : // ! Keep this first
     T extends null ? NullMarker :
     T extends false ? Marker.false :
     T extends true ? Marker.true :
@@ -110,7 +126,7 @@ export type InferHBPType<T> =
         | Float64Array ? VectorMarker :
     T extends Map<any, any> ? MapMarker :
     T extends Error ? Marker.error :
-    T extends object ? DictMarker :
+    T extends object ? DictMarker : // ! Keep this last
     never;
 /* eslint-enable @stylistic/indent */
 
