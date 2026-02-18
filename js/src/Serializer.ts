@@ -296,6 +296,17 @@ function writeExplicit(
         case Marker.unsigned_int_arbitrary: writeArbitraryInt(state, BigInt(data as number)); return;
         case Marker.float_single: writeFloat32(state, Number(data)); return;
         case Marker.float_double: writeFloat64(state, Number(data)); return;
+        case Marker.optional: writeOptional(state, data); return;
+        case Marker.enum: writeEnum(state, data as number | bigint); return;
+        case Marker.union: {
+            if (!Array.isArray(data) || data.length !== 2)
+                throw new Error("Union requires [tag, value]");
+            const [tag, value] = data;
+            writeUnion(state, tag as number | bigint, value);
+            return;
+        }
+        case Marker.error: writeString(state, (data as Error).message); return;
+
         default:
             if (
                 (marker >= Marker.string_utf8_0 && marker <= Marker.string_utf8_15)
@@ -361,12 +372,6 @@ function writeExplicit(
                 return;
             }
 
-            if (marker === Marker.error) {
-                const err = data as Error;
-                writeString(state, err.message);
-                return;
-            }
-
             throw new Error(`Marker ${marker} is not supported in serializeValue`);
     }
 }
@@ -413,23 +418,21 @@ function writeAny(state: BufferWriterState, data: unknown): void {
         return;
     }
 
-    const type = typeof data;
-
-    switch (type) {
+    switch (typeof data) {
         case "boolean":
-            writeUint8(state, data === true ? Marker.true : Marker.false);
+            writeUint8(state, data ? Marker.true : Marker.false);
             break;
         case "number":
-            writeNumber(state, data as number);
+            writeNumber(state, data);
             break;
         case "string":
-            writeString(state, data as string);
+            writeString(state, data);
             break;
         case "bigint":
-            writeBigIntAuto(state, data as bigint);
+            writeBigIntAuto(state, data);
             break;
         case "object":
-            writeObject(state, data as object);
+            writeObject(state, data);
             break;
         case "symbol": { throw new Error('Unsupported type: "symbol"'); }
         case "undefined": { throw new Error('Unsupported type: "undefined"'); }
@@ -681,6 +684,24 @@ function writeMap(state: BufferWriterState, map: Map<any, any>): void {
         writeAny(state, key);
         writeAny(state, value);
     }
+}
+
+function writeOptional(state: BufferWriterState, optional: unknown): void {
+    writeUint8(state, Marker.optional);
+    writeAny(state, optional);
+}
+
+function writeEnum(state: BufferWriterState, value: number | bigint): void {
+    writeUint8(state, Marker.enum);
+    if (!Number.isInteger(value))
+        throw new Error("Enums can only be backed by integers that pass `Number.isInteger`");
+    writeBigIntAuto(state, BigInt(value));
+}
+
+function writeUnion(state: BufferWriterState, tag: number | bigint, value: unknown): void {
+    writeUint8(state, Marker.union);
+    writeEnum(state, BigInt(tag));
+    writeAny(state, value);
 }
 
 function writeError(state: BufferWriterState, error: Error): void {
