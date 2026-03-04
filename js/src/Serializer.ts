@@ -163,44 +163,44 @@ function writeInt8(state: BufferWriterState, value: number): void {
 
 function writeUint16(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 2);
-    state.view.setUint16(state.offset, value, false);
+    state.view.setUint16(state.offset, value, true);
     state.offset += 2;
 }
 
 function writeInt16(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 2);
-    state.view.setInt16(state.offset, value, false);
+    state.view.setInt16(state.offset, value, true);
     state.offset += 2;
 }
 
 function writeUint32(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 4);
-    state.view.setUint32(state.offset, value, false);
+    state.view.setUint32(state.offset, value, true);
     state.offset += 4;
 }
 
 function writeInt32(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 4);
-    state.view.setInt32(state.offset, value, false);
+    state.view.setInt32(state.offset, value, true);
     state.offset += 4;
 }
 
 function writeBigInt64(state: BufferWriterState, value: bigint): void {
     ensureCapacity(state, 8);
-    state.view.setBigInt64(state.offset, value, false);
+    state.view.setBigInt64(state.offset, value, true);
     state.offset += 8;
 }
 
 function writeBigUint64(state: BufferWriterState, value: bigint): void {
     ensureCapacity(state, 8);
-    state.view.setBigUint64(state.offset, value, false);
+    state.view.setBigUint64(state.offset, value, true);
     state.offset += 8;
 }
 
 function writeBigIntBytes(state: BufferWriterState, value: bigint, byteLength: number): void {
     ensureCapacity(state, byteLength);
     let tempVal = value;
-    for (let i = byteLength - 1; i >= 0; i--) {
+    for (let i = 0; i < byteLength; i++) {
         const byte = Number(tempVal & 0xFFn);
         state.view.setUint8(state.offset + i, byte);
         tempVal >>= 8n;
@@ -210,13 +210,13 @@ function writeBigIntBytes(state: BufferWriterState, value: bigint, byteLength: n
 
 function writeFloat32(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 4);
-    state.view.setFloat32(state.offset, value, false);
+    state.view.setFloat32(state.offset, value, true);
     state.offset += 4;
 }
 
 function writeFloat64(state: BufferWriterState, value: number): void {
     ensureCapacity(state, 8);
-    state.view.setFloat64(state.offset, value, false);
+    state.view.setFloat64(state.offset, value, true);
     state.offset += 8;
 }
 
@@ -517,7 +517,7 @@ function writeArbitraryInt(state: BufferWriterState, num: bigint): void {
     writeUint16(state, byteLen);
 
     const buffer = Buffer.allocUnsafe(byteLen);
-    for (let i = byteLen - 1; i >= 0; i--) {
+    for (let i = 0; i < byteLen; i++) {
         buffer[i] = Number(num & 0xFFn);
         num >>= 8n;
     }

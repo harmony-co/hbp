@@ -39,7 +39,7 @@ function readUint(state: BufferReaderState, bytes: number): number {
     const method = `getUint${bytes * 8}`;
     // @ts-expect-error hehe
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const val: number = state.view[method](state.offset);
+    const val: number = state.view[method](state.offset, true);
     state.offset += bytes;
     return val;
 }
@@ -48,7 +48,7 @@ function readInt(state: BufferReaderState, bytes: number): number {
     const method = `getInt${bytes * 8}`;
     // @ts-expect-error hehe
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const val: number = state.view[method](state.offset);
+    const val: number = state.view[method](state.offset, true);
     state.offset += bytes;
     return val;
 }
@@ -57,7 +57,7 @@ function readBigInt(state: BufferReaderState, bytes: number): number {
     const method = `getBigInt${bytes * 8}`;
     // @ts-expect-error hehe
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const val: number = state.view[method](state.offset);
+    const val: number = state.view[method](state.offset, true);
     state.offset += bytes;
     return val;
 }
@@ -66,7 +66,7 @@ function readBigUint(state: BufferReaderState, bytes: number): number {
     const method = `getBigUint${bytes * 8}`;
     // @ts-expect-error hehe
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const val: number = state.view[method](state.offset);
+    const val: number = state.view[method](state.offset, true);
     state.offset += bytes;
     return val;
 }
@@ -75,30 +75,29 @@ function readFloat(state: BufferReaderState, bytes: number): number {
     const method = `getFloat${bytes * 8}`;
     // @ts-expect-error hehe
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const val: number = state.view[method](state.offset);
+    const val: number = state.view[method](state.offset, true);
     state.offset += bytes;
     return val;
 }
 
 function readBigIntBytesSigned(state: BufferReaderState, len: number): bigint {
     let val = 0n;
-    const firstByte = state.view.getUint8(state.offset);
-    const isNegative = (firstByte & 0x80) !== 0;
 
-    for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
+    for (let i = len - 1; i >= 0; i--) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
 
     state.offset += len;
 
-    if (isNegative) {
-        const limit = 1n << (BigInt(len) * 8n);
-        val -= limit;
-    }
+    const bits = BigInt(len * 8);
+    const signBit = 1n << (bits - 1n);
+
+    if (val & signBit) val -= 1n << bits;
+
     return val;
 }
 
 function readBigIntBytesUnsigned(state: BufferReaderState, len: number): bigint {
     let val = 0n;
-    for (let i = 0; i < len; i++) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
+    for (let i = len - 1; i >= 0; i--) val = (val << 8n) | BigInt(state.view.getUint8(state.offset + i));
 
     state.offset += len;
     return val;
