@@ -36,8 +36,6 @@ It consists of a set of primitive types, composite types, and meta types that to
 
 Every serialized HBP value begins with the HBP version used to encode it followed by a marker that represents the type of the data.
 
-![representation image](representation.png)
-
 # Identifier
 
 The HBP identifier is the byte at the beginning of every payload that tells you the version of the protocol and allows developers to pass custom flags.
@@ -108,6 +106,9 @@ Arbitrary sized integers are followed by `2` bytes designating their bit-width, 
 
 ### Floats
 
+> [!CAUTION]
+> Not all float formats are implemented yet, they are present on the spec for future proofing.
+
 | Marker | Data Size (bytes) |                                                     Type                                                      |
 | :----: | :---------------: | :-----------------------------------------------------------------------------------------------------------: |
 |  `30`  |         2         |      [IEEE 754 Half precision float](https://en.wikipedia.org/wiki/Half-precision_floating-point_format)      |
@@ -121,6 +122,9 @@ Arbitrary sized integers are followed by `2` bytes designating their bit-width, 
 |  `3F`  |         2         |             [Brain Floating Point](https://en.wikipedia.org/wiki/Bfloat16_floating-point_format)              |
 
 ### Decimals
+
+> [!CAUTION]
+> Decimals are not yet supported, progress can be tracked [here](https://github.com/ziglang/zig/issues/4221).
 
 | Marker | Data Size (bytes) |                                         Type                                          |
 | :----: | :---------------: | :-----------------------------------------------------------------------------------: |
@@ -154,6 +158,9 @@ The union marker is **always** followed by an integer marker indicating the acti
 
 ## Error
 
+> [!WARNING]
+> Error meta types are not yet supported by the zig implementation
+
 Marker: `FF`
 
 Example:
@@ -170,7 +177,7 @@ Serialized: 01 FF 6B 54 68 69 73 20 46 61 69 6C 65 64
 
 Strings are `UTF-8` encoded arrays of bytes.
 
-> Why aren't strings a meta type on top of Vector? There was a long discussion about this that i need to append here. . .
+> Why aren't strings a meta type on top of Vector? There was a long discussion about this that needs to be appended here. . .
 
 Small strings:
 
@@ -302,6 +309,9 @@ The encoding of a dictionary is as follows:
 
 ## Map
 
+> [!CAUTION]
+> Maps are not yet implemented.
+
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
 |  `D3`  |      1      |      255      |
@@ -309,27 +319,3 @@ The encoding of a dictionary is as follows:
 |  `D5`  |      4      | 4_294_967_295 |
 
 A map is just like a dictionary but instead, the keys can be of any type.
-
-# Cheat Sheet
-
-| Marker  |                   Name                   |                Type                |
-| :-----: | :--------------------------------------: | :--------------------------------: |
-|  `00`   |             [`null`](#null)              | [Primitive](#primitive-data-types) |
-|  `01`   |             [`false`](#bool)             | [Primitive](#primitive-data-types) |
-|  `02`   |             [`true`](#bool)              | [Primitive](#primitive-data-types) |
-| `10-16` |   [`signed integer`](#signed-integers)   | [Primitive](#primitive-data-types) |
-|  `1F`   |   [`signed integer`](#signed-integers)   | [Primitive](#primitive-data-types) |
-| `20-26` | [`unsigned integer`](#unsigned-integers) | [Primitive](#primitive-data-types) |
-|  `2F`   | [`unsigned integer`](#unsigned-integers) | [Primitive](#primitive-data-types) |
-| `30-37` |            [`float`](#floats)            | [Primitive](#primitive-data-types) |
-| `3A-3C` |           [`decimal`](#floats)           | [Primitive](#primitive-data-types) |
-|  `3F`   |          [`bfloat16`](#floats)           | [Primitive](#primitive-data-types) |
-| `70-7F` |            [`tuple`](#tuple)             | [Composite](#composite-data-types) |
-| `80-8F` |           [`vector`](#vector)            | [Composite](#composite-data-types) |
-| `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
-| `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
-| `DA-DC` |            [`tuple`](#tuple)             | [Composite](#composite-data-types) |
-| `DD-DF` |           [`vector`](#vector)            | [Composite](#composite-data-types) |
-|  `E0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
-|  `E1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
-|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |

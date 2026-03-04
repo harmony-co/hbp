@@ -193,13 +193,11 @@ pub fn next(self: *Scanner) !Token {
                     self.state = .post_value;
                     return .{ .float = .{ .bits = 16, .view = self.input[self.cursor - 2 .. self.cursor] } };
                 },
-                // .minifloat,
                 .single_float => {
                     self.cursor += 5;
                     self.state = .post_value;
                     return .{ .float = .{ .bits = 32, .view = self.input[self.cursor - 4 .. self.cursor] } };
                 },
-                // .extended_float_40,
                 .double_float => {
                     self.cursor += 9;
                     self.state = .post_value;
@@ -215,8 +213,19 @@ pub fn next(self: *Scanner) !Token {
                     self.state = .post_value;
                     return .{ .float = .{ .bits = 128, .view = self.input[self.cursor - 16 .. self.cursor] } };
                 },
-                // .octuple_float,
-                // .brain_float,
+                .minifloat,
+                .extended_float_40,
+                .octuple_float,
+                .brain_float,
+                => {
+                    return error.FloatFormatNotImplemented;
+                },
+                .decimal_32,
+                .decimal_64,
+                .decimal_128,
+                => {
+                    return error.DecimalsNotImplemented;
+                },
                 .empty_string,
                 .string_1,
                 .string_2,
