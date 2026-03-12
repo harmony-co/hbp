@@ -9,6 +9,7 @@ It consists of a set of primitive types, composite types, and meta types that to
 
 # Table of Contents
 
+<!--toc:start-->
 - [About](#about)
 - [Table of Contents](#table-of-contents)
 - [Representation](#representation)
@@ -24,13 +25,15 @@ It consists of a set of primitive types, composite types, and meta types that to
 - [Meta Data Types](#meta-data-types)
   - [Optional](#optional)
   - [Enum](#enum)
+  - [Union](#union)
   - [Error](#error)
 - [Composite Data Types](#composite-data-types)
+  - [Strings](#strings)
   - [Tuple](#tuple)
   - [Vector](#vector)
   - [Dictionary](#dictionary)
   - [Map](#map)
-- [Cheat Sheet](#cheat-sheet)
+<!--toc:end-->
 
 # Representation
 
