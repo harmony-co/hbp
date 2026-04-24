@@ -1,7 +1,8 @@
 .{
     .fingerprint = 0x8af3a6b7cf3baeb7,
     .name = .libhbp,
-    .version = "0.0.0",
+    .version = "0.1.0",
+    .minimum_zig_version = "0.16.0",
     .paths = .{
         "build.zig",
         "build.zig.zon",

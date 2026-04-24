@@ -5,14 +5,16 @@
 
 Harmony Binary Protocol (HBP) is a general purpose serialization protocol inspired by the protocols like Bolt's PackStream and Redis's RESP3, that aims to provide a standardized type aware way to serialize and deserialize data.
 
-It consists of a set of basic types, composite types, and meta types that together allow you to represent data in the way you need.
+It consists of a set of primitive types, composite types, and meta types that together allow you to represent data in the way you need.
 
 # Table of Contents
 
+<!--toc:start-->
 - [About](#about)
 - [Table of Contents](#table-of-contents)
 - [Representation](#representation)
-- [Basic Data Types](#basic-data-types)
+- [Identifier](#identifier)
+- [Primitive Data Types](#primitive-data-types)
   - [Null](#null)
   - [Bool](#bool)
   - [Numbers](#numbers)
@@ -21,27 +23,33 @@ It consists of a set of basic types, composite types, and meta types that togeth
     - [Floats](#floats)
     - [Decimals](#decimals)
 - [Meta Data Types](#meta-data-types)
-  - [String](#string)
-  - [Vector](#vector)
   - [Optional](#optional)
   - [Enum](#enum)
+  - [Union](#union)
   - [Error](#error)
 - [Composite Data Types](#composite-data-types)
-  - [Array](#array)
-  - [List](#list)
+  - [Strings](#strings)
+  - [Tuple](#tuple)
+  - [Vector](#vector)
   - [Dictionary](#dictionary)
   - [Map](#map)
-- [Cheat Sheet](#cheat-sheet)
+<!--toc:end-->
 
 # Representation
 
 Every serialized HBP value begins with the HBP version used to encode it followed by a marker that represents the type of the data.
 
-![representation image](representation.png)
+# Identifier
 
-# Basic Data Types
+The HBP identifier is the byte at the beginning of every payload that tells you the version of the protocol and allows developers to pass custom flags.
 
-Basic types (or primitives) are the fundamental blocks used to represent the encoded data.
+The identifier is a single byte subdivided into 2 parts of 4 bits.
+The first 4 bits are reserved for the protocol version, parsers use this information to adapt to version-specific changes.
+The last 4 bits are used for user defined flags, spec compliant parsers will not validate or make use of this bits for anything, they are given to the user as-is.
+
+# Primitive Data Types
+
+Primitive types (or primitives) are the fundamental blocks used to represent the encoded data.
 
 ## Null
 
@@ -101,6 +109,9 @@ Arbitrary sized integers are followed by `2` bytes designating their bit-width, 
 
 ### Floats
 
+> [!CAUTION]
+> Not all float formats are implemented yet, they are present on the spec for future proofing.
+
 | Marker | Data Size (bytes) |                                                     Type                                                      |
 | :----: | :---------------: | :-----------------------------------------------------------------------------------------------------------: |
 |  `30`  |         2         |      [IEEE 754 Half precision float](https://en.wikipedia.org/wiki/Half-precision_floating-point_format)      |
@@ -115,6 +126,9 @@ Arbitrary sized integers are followed by `2` bytes designating their bit-width, 
 
 ### Decimals
 
+> [!CAUTION]
+> Decimals are not yet supported, progress can be tracked [here](https://github.com/ziglang/zig/issues/4221).
+
 | Marker | Data Size (bytes) |                                         Type                                          |
 | :----: | :---------------: | :-----------------------------------------------------------------------------------: |
 |  `3A`  |         4         |  [IEEE 754 Decimal32](https://en.wikipedia.org/wiki/Decimal32_floating-point_format)  |
@@ -127,38 +141,28 @@ Meta data types are special types that acts as metadata for other types and they
 
 HBP reserves all the `E0-FF` range for meta types.
 
-## String
-
-Marker: `E0`
-
-A String is a character encoded list of bytes.
-
-The string marker is always followed by a list marker with the type byte set to one of the following:
-
-| Byte | Encoding |
-| ---- | -------- |
-| `20` | UTF-8    |
-| `21` | UTF-16   |
-
-## Vector
-
-Marker: `E3`
-
-The vector marker must **always** be followed by a list marker to indicate the size and type of the vector, the data should follow the same encoding as the indicated type.
-
 ## Optional
 
-Marker: `F0`
+Marker: `E0`
 
 This marker is used as an indicator that the following marker can either be [`null`](#null) or another type.
 
 ## Enum
 
-Marker: `F1`
+Marker: `E1`
 
 The enum marker must **always** be followed by an integer marker to indicate the maximum size of the enum, the data should follow the same encoding as the indicated type.
 
+## Union
+
+Marker: `E2`
+
+The union marker is **always** followed by an integer marker indicating the active tag followed by the union data.
+
 ## Error
+
+> [!WARNING]
+> Error meta types are not yet supported by the zig implementation
 
 Marker: `FF`
 
@@ -172,11 +176,47 @@ Serialized: 01 FF 6B 54 68 69 73 20 46 61 69 6C 65 64
 
 # Composite Data Types
 
-## Array
+## Strings
 
-Small arrays:
+Strings are `UTF-8` encoded arrays of bytes.
 
-| Marker | Array size |
+> Why aren't strings a meta type on top of Vector? There was a long discussion about this that needs to be appended here. . .
+
+Small strings:
+
+| Marker | String size |
+| :----: | :---------: |
+|  `60`  |      0      |
+|  `61`  |      1      |
+|  `62`  |      2      |
+|  `63`  |      3      |
+|  `64`  |      4      |
+|  `65`  |      5      |
+|  `66`  |      6      |
+|  `67`  |      7      |
+|  `68`  |      8      |
+|  `69`  |      9      |
+|  `6A`  |     10      |
+|  `6B`  |     11      |
+|  `6C`  |     12      |
+|  `6D`  |     13      |
+|  `6E`  |     14      |
+|  `6F`  |     15      |
+
+Long Strings:
+
+| Marker | Extra bytes | Maximum Size  |
+| :----: | :---------: | :-----------: |
+|  `C0`  |      1      |      255      |
+|  `C1`  |      2      |    65_535     |
+|  `C2`  |      4      | 4_294_967_295 |
+
+
+## Tuple
+
+Small tuples:
+
+| Marker | Tuple size |
 | :----: | :--------: |
 |  `70`  |     0      |
 |  `71`  |     1      |
@@ -195,7 +235,7 @@ Small arrays:
 |  `7E`  |     14     |
 |  `7F`  |     15     |
 
-Long arrays:
+Long tuples:
 
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
@@ -203,7 +243,7 @@ Long arrays:
 |  `DB`  |      2      |    65_535     |
 |  `DC`  |      4      | 4_294_967_295 |
 
-An array is a list of values, each one serializing their own type alongside like a basic hbp payload. If its a long array, the length will come **after** the value type.
+A tuple is a list of values, each one serializing their own type alongside like a basic hbp payload. If its a long array, the length will come **after** the value type.
 
 ```txt
 Original: [3, 6, 9]
@@ -212,30 +252,30 @@ Serialized: 01 73 10 03 10 06 10 09
 ```
 
 
-## List
+## Vector
 
-Small lists:
+Small vectors:
 
-| Marker | List Size |
-| :----: | :-------: |
-|  `80`  |     0     |
-|  `81`  |     1     |
-|  `82`  |     2     |
-|  `83`  |     3     |
-|  `84`  |     4     |
-|  `85`  |     5     |
-|  `86`  |     6     |
-|  `87`  |     7     |
-|  `88`  |     8     |
-|  `89`  |     9     |
-|  `8A`  |    10     |
-|  `8B`  |    11     |
-|  `8C`  |    12     |
-|  `8D`  |    13     |
-|  `8E`  |    14     |
-|  `8F`  |    15     |
+| Marker | Vector Size |
+| :----: | :---------: |
+|  `80`  |      0      |
+|  `81`  |      1      |
+|  `82`  |      2      |
+|  `83`  |      3      |
+|  `84`  |      4      |
+|  `85`  |      5      |
+|  `86`  |      6      |
+|  `87`  |      7      |
+|  `88`  |      8      |
+|  `89`  |      9      |
+|  `8A`  |     10      |
+|  `8B`  |     11      |
+|  `8C`  |     12      |
+|  `8D`  |     13      |
+|  `8E`  |     14      |
+|  `8F`  |     15      |
 
-Long lists:
+Long vectors:
 
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
@@ -243,12 +283,12 @@ Long lists:
 |  `DE`  |      2      |    65_535     |
 |  `DF`  |      4      | 4_294_967_295 |
 
-A list as the name indicates is a list of values where all the values have the same type which has to be indicated right after the list marker. If its a long list, the length will come **after** the value type.
+A vector is a known-type list of items. The vector marker is followed by [primitive data type](#primitive-data-types) and all elements will follow the encoding of that type.
 
 ```txt
-Original: List([3, 6, 9])
+Original: Vector(u8, [3, 6, 9])
 
-Serialized: 01 83 10 03 06 09
+Serialized: 01 83 20 03 06 09
 ```
 
 ## Dictionary
@@ -272,6 +312,9 @@ The encoding of a dictionary is as follows:
 
 ## Map
 
+> [!CAUTION]
+> Maps are not yet implemented.
+
 | Marker | Extra bytes | Maximum Size  |
 | :----: | :---------: | :-----------: |
 |  `D3`  |      1      |      255      |
@@ -279,29 +322,3 @@ The encoding of a dictionary is as follows:
 |  `D5`  |      4      | 4_294_967_295 |
 
 A map is just like a dictionary but instead, the keys can be of any type.
-
-# Cheat Sheet
-
-| Marker  |                   Name                   |                Type                |
-| :-----: | :--------------------------------------: | :--------------------------------: |
-|  `00`   |             [`null`](#null)              |   [Primitive](#basic-data-types)   |
-|  `01`   |             [`false`](#bool)             |   [Primitive](#basic-data-types)   |
-|  `02`   |             [`true`](#bool)              |   [Primitive](#basic-data-types)   |
-| `10-16` |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
-|  `1F`   |   [`signed integer`](#signed-integers)   |   [Primitive](#basic-data-types)   |
-| `20-26` | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
-|  `2F`   | [`unsigned integer`](#unsigned-integers) |   [Primitive](#basic-data-types)   |
-| `30-37` |            [`float`](#floats)            |   [Primitive](#basic-data-types)   |
-| `3A-3C` |           [`decimal`](#floats)           |   [Primitive](#basic-data-types)   |
-|  `3F`   |          [`bfloat16`](#floats)           |   [Primitive](#basic-data-types)   |
-| `70-7F` |            [`array`](#array)             | [Composite](#composite-data-types) |
-| `80-8F` |             [`list`](#list)              | [Composite](#composite-data-types) |
-| `D0-D2` |       [`dictionary`](#dictionary)        | [Composite](#composite-data-types) |
-| `D3-D5` |              [`map`](#map)               | [Composite](#composite-data-types) |
-| `DA-DC` |            [`array`](#array)             | [Composite](#composite-data-types) |
-| `DD-DF` |             [`list`](#list)              | [Composite](#composite-data-types) |
-|  `E0`   |           [`string`](#string)            |      [Meta](#meta-data-types)      |
-|  `E3`   |           [`vector`](#vector)            |      [Meta](#meta-data-types)      |
-|  `F0`   |         [`optional`](#optional)          |      [Meta](#meta-data-types)      |
-|  `F1`   |             [`enum`](#enum)              |      [Meta](#meta-data-types)      |
-|  `FF`   |            [`error`](#error)             |      [Meta](#meta-data-types)      |
