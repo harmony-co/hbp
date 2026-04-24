@@ -42,7 +42,7 @@ const test_float = [_][]const u8{
 };
 
 pub fn main() !void {
-    var allocator: std.heap.GeneralPurposeAllocator(.{}) = .init;
+    var allocator: std.heap.DebugAllocator(.{}) = .init;
     const gpa = allocator.allocator();
 
     for (test_bool) |in| {
@@ -105,5 +105,5 @@ fn readableOutput(buffer: []u8, input: []const u8) []const u8 {
 }
 
 test {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

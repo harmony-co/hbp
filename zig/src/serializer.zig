@@ -3,7 +3,7 @@ const MarkerType = @import("./Scanner.zig").MarkerType;
 
 const HBP_VERSION = 1;
 
-pub fn serializeComptime(comptime T: type, value: T) []const u8 {
+pub inline fn serializeComptime(comptime T: type, comptime value: T) []const u8 {
     comptime {
         var buf: [512]u8 = undefined;
         var w: std.Io.Writer = .fixed(&buf);
